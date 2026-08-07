@@ -1,26 +1,131 @@
 @import "tailwindcss";
 
+/*
+ * Consignment Warehouse — admin portal design tokens.
+ * Light, dense, professional. Deliberately NOT the dark, photo-led consumer app.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --surface-sunken: #f0f1f4;
+  --border: #e2e4e9;
+  /* Darkened from #C7CAD1: an input outline needs 3:1 against both the
+     surface and the sunken fill it can sit on (WCAG 1.4.11). */
+  --border-strong: #898c94;
+  --text: #14161a;
+  --text-muted: #5b6270; /* darkened from #6B7280 to clear WCAG AA on sunken surfaces */
+  --accent: #2563eb;
+  --accent-ink: #ffffff;
+  --danger: #dc2626;
+  --warning: #d97706;
+  --success: #16a34a;
+
+  /* Ink variants: the raw status hues are too light for AA text on white,
+     so badges and inline status text use these darker readings instead. */
+  --danger-ink: #991b1b;
+  --warning-ink: #92400e;
+  --success-ink: #15803d;
+  --accent-ink-on-light: #1d4ed8;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-strong: var(--accent-ink-on-light);
+  --color-danger: var(--danger);
+  --color-danger-ink: var(--danger-ink);
+  --color-warning: var(--warning);
+  --color-warning-ink: var(--warning-ink);
+  --color-success: var(--success);
+  --color-success-ink: var(--success-ink);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --text-xs: 11px;
+  --text-sm: 12.5px;
+  --text-base: 13.5px;
+  --text-lg: 15px;
+  --text-xl: 18px;
+  --text-2xl: 22px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Tailwind v4 defaults border-color to currentColor; this app wants the token. */
+@layer base {
+  *,
+  ::after,
+  ::before {
+    border-color: var(--border);
+  }
+
+  html {
+    font-size: 16px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+    font-size: var(--text-base);
+    line-height: 1.45;
+  }
+
+  /* Money and counts must line up column-to-column. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  ::placeholder {
+    color: var(--text-muted);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@utility pulse-live {
+  animation: cw-pulse 2s ease-in-out infinite;
+}
+
+@keyframes cw-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes cw-flash {
+  from {
+    background-color: color-mix(in srgb, var(--success) 22%, transparent);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+@utility flash-update {
+  animation: cw-flash 1.2s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
