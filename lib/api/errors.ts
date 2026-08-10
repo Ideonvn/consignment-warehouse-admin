@@ -3,10 +3,12 @@
  *
  * The backend speaks `{"detail": "..."}` almost everywhere, but two responses
  * are structured and carry information the UI must not throw away:
- *   - frozen field (409): `{"detail": {"message", "field"}}` — highlight that input
- *   - bid too low (422): `{"detail": {"message", "minimum_next_bid_minor"}}`
+ *   - `FrozenFieldOut` (409): `{"detail": {"message", "field"}}` — highlight that input
+ *   - `BidTooLowOut` (422): `{"detail": {"message", "minimum_next_bid_minor"}}`
+ * Both are declared in the backend's OpenAPI and parsed against those schemas.
  * FastAPI's own request validation also answers 422 with an array of issues.
  */
+import { bidTooLowErrorSchema, frozenFieldErrorSchema } from "@/types/api";
 
 export type ApiErrorKind =
   | "network"
@@ -67,26 +69,43 @@ export class ApiError extends Error {
       ? Number.parseInt(retryAfterRaw, 10)
       : undefined;
 
-    const detailValue = isRecord(payload) ? payload.detail : undefined;
-
-    // Structured object detail: frozen field or bid-too-low.
-    if (isRecord(detailValue)) {
-      const message =
-        asString(detailValue.message) ??
-        asString(detailValue.detail) ??
-        defaultMessage(status);
-      const field = asString(detailValue.field);
-      const minimumNextBidMinor = asNumber(detailValue.minimum_next_bid_minor);
+    // The two structured shapes are specified in the backend's OpenAPI, so they
+    // are matched against their schemas rather than sniffed field by field.
+    const frozenField = frozenFieldErrorSchema.safeParse(payload);
+    if (frozenField.success) {
       return new ApiError({
         status,
-        detail: message,
-        kind: field
-          ? "frozen_field"
-          : minimumNextBidMinor !== undefined
-            ? "bid_too_low"
-            : kindForStatus(status),
-        field,
-        minimumNextBidMinor,
+        detail: frozenField.data.detail.message,
+        kind: "frozen_field",
+        field: frozenField.data.detail.field,
+        retryAfterSeconds,
+        payload,
+      });
+    }
+
+    const bidTooLow = bidTooLowErrorSchema.safeParse(payload);
+    if (bidTooLow.success) {
+      return new ApiError({
+        status,
+        detail: bidTooLow.data.detail.message,
+        kind: "bid_too_low",
+        minimumNextBidMinor: bidTooLow.data.detail.minimum_next_bid_minor,
+        retryAfterSeconds,
+        payload,
+      });
+    }
+
+    const detailValue = isRecord(payload) ? payload.detail : undefined;
+
+    // Any other object detail: take a message off it if there is one.
+    if (isRecord(detailValue)) {
+      return new ApiError({
+        status,
+        detail:
+          asString(detailValue.message) ??
+          asString(detailValue.detail) ??
+          defaultMessage(status),
+        kind: kindForStatus(status),
         retryAfterSeconds,
         payload,
       });
@@ -167,10 +186,6 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 
 function asString(v: unknown): string | undefined {
   return typeof v === "string" && v.length > 0 ? v : undefined;
-}
-
-function asNumber(v: unknown): number | undefined {
-  return typeof v === "number" ? v : undefined;
 }
 
 /** Human-facing message for anything thrown, API error or not. */

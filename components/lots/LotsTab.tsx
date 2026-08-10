@@ -21,7 +21,7 @@ import {
   type LotAdminSummary,
   type LotStatus,
 } from "@/types/api";
-import { LotThumb, useLotThumbnails } from "./LotThumb";
+import { LotThumb } from "./LotThumb";
 
 export function LotsTab({ auction }: { auction: AuctionAdmin }) {
   const router = useRouter();
@@ -31,7 +31,6 @@ export function LotsTab({ auction }: { auction: AuctionAdmin }) {
   const [selection, setSelection] = useState<RowSelectionState>({});
 
   const lots = useMemo(() => data ?? [], [data]);
-  const thumbnails = useLotThumbnails(lots.map((lot) => lot.id));
 
   const rows = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -68,7 +67,7 @@ export function LotsTab({ auction }: { auction: AuctionAdmin }) {
         meta: { width: "3rem" },
         cell: ({ row }) => (
           <LotThumb
-            url={thumbnails.get(row.original.id)}
+            url={row.original.primary_image_url}
             alt={`Primary image for ${row.original.title}`}
           />
         ),
@@ -192,7 +191,7 @@ export function LotsTab({ auction }: { auction: AuctionAdmin }) {
         },
       },
     ],
-    [currency, thumbnails],
+    [currency],
   );
 
   const selectedCount = Object.values(selection).filter(Boolean).length;

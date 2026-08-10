@@ -4,11 +4,11 @@ Running log of judgement calls, deferrals and things to ask the backend for.
 
 ## Judgement calls
 
-**The dev server runs on port 5173, not 3000.** The backend's CORS allowlist
-only contains `http://localhost:3000` and `http://localhost:5173`, and 3000 is
-the bidder-facing app. `npm run dev` and `npm run start` are pinned to 5173 so
-the portal has a working origin alongside the consumer app. See "Backend
-requests" — this should be a configured admin origin, not a borrowed one.
+**The dev server runs on port 3100.** The backend's CORS allowlist is
+`http://localhost:3000` for the bidder app and `http://localhost:3100` for this
+portal, so both run against the same backend. `npm run dev` and `npm run start`
+are pinned to 3100. This is now a dedicated admin origin rather than the
+borrowed Vite port the portal used to sit on.
 
 **Money parsing is strict rather than clever.** `MoneyInput` accepts digits with
 a single `.` or `,` as the decimal separator and ignores spaces. Anything
@@ -34,6 +34,19 @@ meaningful global route (there is no cross-auction lot endpoint), so they point
 at whichever auction the operator is working inside and are disabled with an
 explanation when there is none.
 
+**The decisions queue is one call.** `GET /admin/lots?status=ended_reserve_not_met`
+replaced iterating every auction's lots. The server returns them ordered by
+closing time then lot number, so the screen does not re-sort, and paging is
+`limit`/`offset`. The sidebar badge is its own small query so the count does not
+depend on which page is open.
+
+**The socket resumes with per-lot `after_sequences`.** Sequences are per lot, so
+the scalar `after_sequence` is wrong for all but one lot of a batch. The client
+used to work around that by grouping lots by their last-known sequence and
+sending one subscribe per group, capped at 30 messages. It now sends the per-lot
+map the backend added, which is both correct and fewer messages; the chunk size
+dropped to 40 lot ids per message because the map repeats each id.
+
 **Increment rules on the create form are applied after creation.** Rules can only
 be attached to an auction that exists, so the create page collects them locally
 and POSTs them once the auction is created. If a rule is rejected the auction is
@@ -55,44 +68,54 @@ input boundary. `--text-muted` was likewise darkened from `#6B7280` to `#5B6270`
 so it clears 4.5:1 on the sunken surface as well as on white. Every other token
 is as specified.
 
-**Thumbnails and lot counts are fetched per row.** Neither `AuctionAdminOut` nor
-`LotAdminSummaryOut` carries them. Both use long stale times, and thumbnail
-fetching is capped at 60 lots per table.
+**Lot counts and thumbnails come straight off the list payloads.**
+`AuctionAdminOut.lot_count` and `LotAdminSummaryOut.primary_image_url` removed
+the two per-row fan-outs the portal used to do, along with the 60-lot thumbnail
+cap that existed to bound them. The auctions screen is now two requests (the
+list, plus the decisions badge count) regardless of how many auctions exist.
 
 **Photos use `<img>`, not `next/image`.** The object store's host is not known at
 build time, so `images.remotePatterns` cannot be configured for it.
 
 ## Backend requests
 
-1. **Add an admin origin to CORS.** Only `localhost:3000` and `localhost:5173`
-   are allowed. The admin portal is squatting on the Vite default port because
-   the bidder app owns 3000.
-2. **Add `lot_count` to `AuctionAdminOut`.** The auctions list shows a lot count
-   per row and currently fetches every auction's lots to get it.
-3. **Add `primary_image_url` to `LotAdminSummaryOut`.** The lots table shows a
-   thumbnail per row and currently fetches each lot's images.
-4. **Add a cross-auction endpoint for lots needing a decision**, e.g.
-   `GET /admin/lots?status=ended_reserve_not_met`. The decisions queue is the
-   screen the whole design points at, and it is built by fanning out over every
-   auction's lots.
-5. **Include the leading bidder's handle on the lot shapes.** Both admin lot
-   shapes expose `current_leader_user_id` but no handle, so the decisions queue
-   fetches the top bid per row purely to show a name.
-6. **`GET /admin/lots/{id}` omits `relisted_from_lot_id`** even though
-   `LotAdminSummaryOut` carries it and the spec asks for a link back to the
-   original. The lot screen reads it from the auction's lot list instead.
-7. **`POST /ws/ticket` error responses carry no CORS headers.** A rate-limited
-   or failed ticket mint reaches the browser as an opaque network failure, so
-   the client cannot read `Retry-After` and treats it as "offline" (it backs off
-   and recovers, but blindly).
-8. **Document the `after_sequence` semantics on `subscribe`.** Sequences are
-   per-lot but `subscribe` takes a single `after_sequence` for a batch of
-   `lot_ids`. This client groups lots by their last-known sequence and sends one
-   subscribe per group; a per-lot form would be unambiguous.
-9. **The OTP endpoint is rate-limited per source address**, which makes scripted
-   verification against a local backend slow. A local-only bypass would help.
-10. **Consider a documented shape for the bid-too-low 422.** It is described as
-   structured but not specified; the client parses it defensively.
+### Resolved — the portal now uses these
+
+Requests 1–6 and 8 from the previous round have all landed and the workarounds
+they existed for are gone:
+
+1. A dedicated admin CORS origin (`http://localhost:3100`).
+2. `AuctionAdminOut.lot_count`.
+3. `LotAdminSummaryOut.primary_image_url`.
+4. `GET /admin/lots?status=&auction_id=&limit=&offset=`, ordered by
+   `effective_ends_at` then `lot_number`.
+5. `current_leader_handle` on both admin lot shapes.
+6. `relisted_from_lot_id` on `LotAdminOut`.
+7. `after_sequences` (per-lot map) on `subscribe`.
+
+### Still open
+
+1. **The OTP endpoint is rate-limited per source address**, which makes scripted
+   verification against a local backend slow — several verification runs in this
+   round were spent waiting for the per-address window to clear. A local-only
+   bypass would help.
+
+### Corrected — the CORS-on-errors report was wrong
+
+The previous round claimed `POST /ws/ticket` error responses carry no CORS
+headers. **That was investigated and does not reproduce.** Handled errors,
+including 429, do carry CORS headers, because `ExceptionMiddleware` sits inside
+`CORSMiddleware` — a 401 from `/admin/auctions` was confirmed in this round to
+come back with `access-control-allow-origin` intact.
+
+What was almost certainly being hit is a **preflight from an origin outside the
+allowlist**, which returns a bare `400` with no CORS headers and surfaces in the
+browser as an opaque network failure — indistinguishable from the API being
+down. The portal was on Vite's 5173 at the time and could fall back to 5174 if
+another Vite process had taken it, silently putting it outside the allowlist.
+Moving to the dedicated 3100 origin removes the cause. Worth knowing, because
+the symptom points at the wrong thing: it looks like the backend is unreachable
+when in fact the origin is simply not on the list.
 
 ## Deferred
 
@@ -104,11 +127,6 @@ build time, so `images.remotePatterns` cannot be configured for it.
   the client reads `X-Next-Cursor` / `X-Has-More`, but the lot screen loads only
   the first 50 and says so rather than offering "load more". Deferred because
   nothing in the operator journey needs deeper history yet.
-- **Superadmin role changes could not be exercised end to end.** The seeded
-  admin (`+27820000001`) has role `admin`, and no superadmin account exists in
-  the seed data. The control is correctly hidden for a plain admin, with an
-  explanation; the change-role dialog itself has not been run against a real
-  `POST /admin/users/{id}/role`.
 - **`PATCH /auth/me`** (operator's own profile) is typed in `types/api.ts` but has
   no screen. Nothing in the milestones asked for one.
 - **Voiding a bid from the monitor.** Void lives on the lot detail screen only;
@@ -132,10 +150,21 @@ build time, so `images.remotePatterns` cannot be configured for it.
 - **`/users/[userId]` was missing entirely.** The route file had been written to
   the wrong directory and the 404 only showed up when the journey opened a user.
 
+## Bugs found and fixed in the second round
+
+- **The `resync_too_far` fallback was silent and could be overridden.** Both
+  described under "Second-round verification" below.
+- **The 409 message was padded with boilerplate.** The users screen appended
+  "you cannot act on your own account, and the last active superadmin cannot be
+  suspended or demoted" to every 409, which read as a contradiction next to the
+  server's already-specific "the last active superadmin cannot be suspended".
+  The server's message is now passed through as-is.
+
 ## M10 journey result
 
 Walked on 2026-08-08 against the backend on `localhost:8000` (Postgres, Valkey
-and MinIO from `make dev`, seeded with `make seed`), portal on `localhost:5173`,
+and MinIO from `make dev`, seeded with `make seed`), portal on `localhost:5173`
+(the port the portal used before the backend added a dedicated admin origin),
 bidder app on `localhost:3000`.
 
 | Step | Result |
@@ -156,18 +185,81 @@ bidder app on `localhost:3000`.
 | Find a user and suspend them | **Pass.** Found by partial phone (`0000002`), suspended with an operator-typed reason. |
 | Confirm their session ends | **Pass.** `active_sessions` went from 19 to 0 while `bid_count`, `lots_bid_on` and `lots_currently_winning` were untouched — the bids stood, exactly as the confirmation said. Reactivated afterwards to leave the seed data usable. |
 
-### Not verified
+### Previously not verified — all four now closed
 
-- **Superadmin role changes.** No superadmin exists in the seed data and the
-  seeded admin is a plain `admin`, so `POST /admin/users/{id}/role` was never
-  called. The control is correctly hidden with an explanation, and the 403/409
-  paths are handled in code but untested against the live API.
-- **The withdraw confirmation's with-bids wording.** Verified by reading, not by
-  running it against a lot that had bids.
-- **`resync_too_far` and the reconnect catch-up path.** The socket dropped and
-  recovered once during the journey (a `ws/ticket` request failed CORS, the
-  client backed off and reconnected cleanly), but no gap large enough to trigger
-  `resync_too_far` occurred, so that branch is untested against the live server.
-- **Anti-snipe extensions in the monitor.** No bid landed inside the anti-snipe
-  window during the run, so `lot_extended` was never received. The handling and
-  the visual call-out are implemented but unexercised.
+The four gaps left open after the first round were closed on 2026-08-10 against
+the backend with the lifecycle worker running and fresh seed data. See the
+section below.
+
+## Second-round verification (2026-08-10)
+
+Backend on `localhost:8000` with the lifecycle worker up, freshly seeded; portal
+on `localhost:3100`.
+
+**Superadmin role change — pass.** Signed in as `+27820000000` (Nomsa Khumalo,
+superadmin). The change-role control appears for a superadmin and is hidden with
+an explanation for a plain admin — confirmed in both directions in one session,
+because demoting the signed-in operator mid-run made the control disappear
+without a reload of the app. A real `POST /admin/users/{id}/role` promoted
+Ayanda to superadmin and later returned her to admin.
+
+**409 guard — own role: pass.** `POST /admin/users/{id}/role` targeting the
+caller returns `409 {"detail": "an admin cannot change their own role"}`. The UI
+hides the control on your own account before the request is ever made, so this
+was confirmed directly against the API.
+
+**409 guard — last active superadmin: pass, via suspend.** Worth recording
+precisely, because the guard is **not reachable through the role endpoint**:
+with exactly one superadmin left, the only account that could demote them is
+their own, and the self-change guard fires first. It is reachable through
+suspend — an admin suspending the last active superadmin gets
+`409 {"detail": "the last active superadmin cannot be suspended"}`. Exercised
+through the UI; the message is shown inline in the dialog and the account is
+left untouched.
+
+**Withdraw with bids — pass.** A bid was placed on lot 5 from a seeded bidder,
+then the lot was withdrawn. The dialog stated "It already has 1 bid, currently
+at R 450,00. That bid history stands as a record, automatic bids are
+deactivated, and everyone watching this lot is notified that it was withdrawn."
+After withdrawal the lot reads `Withdrawn` and the bid row is still present and
+still `Active`.
+
+**Anti-snipe `lot_extended` — pass.** A lot's `effective_ends_at` was pulled to
+150 s away (inside the 300 s anti-snipe window) and a bid placed. The API
+answered `extended: true`. In the monitor, which was open throughout, the
+countdown jumped from `2m 18s` to `4m 56s`, the extensions column went to `+1`,
+and the activity feed gained a second entry, "Anti-snipe extension — the clock
+moved". The feed is the proof this came from the socket: it is built only from
+WebSocket events and the 20-second REST poll never writes to it.
+
+**`resync_too_far` — pass, and it found a bug.** Forced by lowering
+`WS_RESYNC_MAX_EVENTS` to 0 locally (restored to 200 afterwards), dropping the
+socket, and landing a bid the client could not see. The exact server frame was
+also captured directly with a throwaway WebSocket client:
+
+```
+{"type": "resync_too_far", "lot_id": "...", "latest_sequence": 2,
+ "effective_ends_at": "...", "status": "live", "current_bid_minor": 255000}
+```
+
+The client falls back to a REST refetch rather than rendering a gap. Two real
+problems surfaced and are fixed:
+
+- The fallback was **silent**. `lastError` was only rendered while the socket
+  was disconnected, so a gap filled while the connection was otherwise healthy
+  told the operator nothing. The monitor now shows a short-lived notice saying
+  the figures were reloaded from the API.
+- The refetch was **overridden by a stale overlay**. The socket overlay takes
+  precedence over the REST snapshot, so after a gap the bid *count* updated but
+  the *price* stayed at the last value the socket had seen — R3 050 on screen
+  against R4 050 on the server. The overlay is now cleared when a gap forces a
+  refetch, which is exactly the case it must not win. Re-tested: after a missed
+  bid the monitor showed R8 250,00 / 10 bids, matching the server exactly.
+
+### Still not verified
+
+- **Two lots closing simultaneously in the monitor.** `lot_closed` handling is
+  exercised by single lots only.
+- **The 200-lot subscription cap.** No auction here is that large, so the
+  "subscribe to what is visible, poll the rest" path is still untested against a
+  real oversized auction.

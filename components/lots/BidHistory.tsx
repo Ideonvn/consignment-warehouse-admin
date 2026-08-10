@@ -39,7 +39,7 @@ export function BidHistory({
       void client.invalidateQueries({ queryKey: queryKeys.lotBids(lotId) });
       void client.invalidateQueries({ queryKey: queryKeys.lot(lotId) });
       void client.invalidateQueries({ queryKey: queryKeys.lots(auctionId) });
-      void client.invalidateQueries({ queryKey: queryKeys.decisions });
+      void client.invalidateQueries({ queryKey: queryKeys.decisionsRoot });
       toast.success(
         `Bid voided. The lot now stands at ${formatMoney(
           result.current_bid_minor,

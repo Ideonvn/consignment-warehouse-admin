@@ -17,6 +17,8 @@ export const queryKeys = {
   users: (params: ListUsersParams = {}) => ["users", params] as const,
   user: (userId: string) => ["user", userId] as const,
 
-  /** Every reserve-not-met lot across every auction. */
-  decisions: ["decisions"] as const,
+  /** Every reserve-not-met lot across every auction, one page at a time. */
+  decisionsRoot: ["decisions"] as const,
+  decisions: (page: number) => ["decisions", "page", page] as const,
+  decisionCount: ["decisions", "count"] as const,
 };

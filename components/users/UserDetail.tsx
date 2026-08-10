@@ -48,11 +48,12 @@ export function UserDetail({ userId }: { userId: string }) {
     void client.invalidateQueries({ queryKey: ["users"] });
   }
 
-  /** The backend's 409 guards, in the operator's words. */
+  /**
+   * The backend's 409 guards already name the exact reason ("an admin cannot
+   * change their own role", "the last active superadmin cannot be suspended"),
+   * so they are passed through rather than padded with a generic restatement.
+   */
   function explain(err: unknown): string {
-    if (isApiError(err) && err.status === 409) {
-      return `${err.detail} — you cannot act on your own account, and the last active superadmin cannot be suspended or demoted.`;
-    }
     if (isApiError(err) && err.status === 403) {
       return "Only a superadmin can change roles.";
     }

@@ -105,6 +105,7 @@ export const auctionAdminSchema = z.object({
   created_by_user_id: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
+  lot_count: z.number(),
 });
 export type AuctionAdmin = z.infer<typeof auctionAdminSchema>;
 
@@ -187,6 +188,8 @@ export const lotAdminSummarySchema = z.object({
   bid_count: z.number(),
   bid_sequence: z.number(),
   relisted_from_lot_id: z.string().nullable(),
+  primary_image_url: z.string().nullable(),
+  current_leader_handle: z.string().nullable(),
 });
 export type LotAdminSummary = z.infer<typeof lotAdminSummarySchema>;
 
@@ -230,7 +233,8 @@ export const lotAdminDetailSchema = z.object({
   am_i_leading: z.boolean().nullish(),
   reserve_price_minor: z.number().nullable(),
   current_leader_user_id: z.string().nullable(),
-  relisted_from_lot_id: z.string().nullish(),
+  current_leader_handle: z.string().nullable(),
+  relisted_from_lot_id: z.string().nullable(),
 });
 export type LotAdminDetail = z.infer<typeof lotAdminDetailSchema>;
 
@@ -328,6 +332,26 @@ export const ALLOWED_IMAGE_TYPES = [
 ] as const;
 /** The API rejects larger; the storage policy enforces it again on upload. */
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
+/* --------------------------------------------------- structured errors */
+
+/** 409 on a frozen field: the API names the input that cannot change. */
+export const frozenFieldErrorSchema = z.object({
+  detail: z.object({
+    message: z.string(),
+    field: z.string(),
+  }),
+});
+export type FrozenFieldError = z.infer<typeof frozenFieldErrorSchema>;
+
+/** 422 when a bid is under the next valid increment. */
+export const bidTooLowErrorSchema = z.object({
+  detail: z.object({
+    message: z.string(),
+    minimum_next_bid_minor: z.number(),
+  }),
+});
+export type BidTooLowError = z.infer<typeof bidTooLowErrorSchema>;
 
 /* ------------------------------------------------------------------ users */
 
@@ -449,7 +473,13 @@ export const wsServerMessageSchema = z.discriminatedUnion("type", [
 export type WsServerMessage = z.infer<typeof wsServerMessageSchema>;
 
 export type WsClientMessage =
-  | { action: "subscribe"; lot_ids: string[]; after_sequence?: number }
+  | {
+      action: "subscribe";
+      lot_ids: string[];
+      /** Per-lot resume points. Sequences are per lot, so this map is the
+       *  correct form; a single scalar is wrong for all but one of a batch. */
+      after_sequences?: Record<string, number>;
+    }
   | { action: "unsubscribe"; lot_ids: string[] }
   | { action: "resync"; lot_id: string; after_sequence: number }
   | { action: "ping" }

@@ -21,7 +21,7 @@ import type { LotAdminSummary } from "@/types/api";
 
 /** REST snapshot with anything the socket has since told us folded on top. */
 function merge(lot: LotAdminSummary, live: LiveLotState | undefined) {
-  if (!live) return { lot, handle: null as string | null };
+  if (!live) return { lot, handle: lot.current_leader_handle };
   return {
     lot: {
       ...lot,
@@ -31,7 +31,7 @@ function merge(lot: LotAdminSummary, live: LiveLotState | undefined) {
       extension_count: live.extensionCount ?? lot.extension_count,
       status: live.status ?? lot.status,
     },
-    handle: live.bidderHandle,
+    handle: live.bidderHandle ?? lot.current_leader_handle,
   };
 }
 
@@ -51,6 +51,7 @@ export function AuctionMonitor({ auctionId }: { auctionId: string }) {
   const nowMs = useNow(1000);
   const connectionStatus = useRealtimeStore((s) => s.status);
   const lastError = useRealtimeStore((s) => s.lastError);
+  const lastGapAt = useRealtimeStore((s) => s.lastGapAt);
 
   const auction = auctionQuery.data;
   const currency = auction?.currency_code ?? "ZAR";
@@ -130,6 +131,18 @@ export function AuctionMonitor({ auctionId }: { auctionId: string }) {
           )}
         </Note>
       )}
+
+      {connectionStatus === "open" &&
+        lastGapAt !== null &&
+        nowMs !== null &&
+        nowMs - lastGapAt < 30_000 && (
+          <Note tone="warning" className="mb-3">
+            The live feed missed some events and could not replay them, so these
+            figures were just reloaded from the API instead. Everything below is
+            current.
+            {lastError && <span className="mt-1 block text-xs">{lastError}</span>}
+          </Note>
+        )}
 
       {unsubscribedCount > 0 && (
         <Note tone="warning" className="mb-3">
@@ -247,14 +260,7 @@ export function AuctionMonitor({ auctionId }: { auctionId: string }) {
                           {lot.bid_count}
                         </td>
                         <td className="px-2.5 py-1.5 text-xs">
-                          {handle ??
-                            (lot.current_leader_user_id ? (
-                              <span className="font-mono text-text-muted">
-                                {lot.current_leader_user_id.slice(0, 8)}…
-                              </span>
-                            ) : (
-                              <span className="text-text-muted">—</span>
-                            ))}
+                          {handle ?? <span className="text-text-muted">—</span>}
                         </td>
                         <td className="tnum px-2.5 py-1.5 text-right">
                           {lot.extension_count > 0 ? (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -14,44 +14,41 @@ import {
   TableSkeleton,
 } from "@/components/ui/Feedback";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { acceptReserve, listLotBids } from "@/lib/api/endpoints";
+import { acceptReserve } from "@/lib/api/endpoints";
 import { errorMessage } from "@/lib/api/errors";
-import { useDecisions, type DecisionLot } from "@/lib/api/queries";
+import {
+  DECISIONS_PAGE_SIZE,
+  useAuctions,
+  useDecisions,
+} from "@/lib/api/queries";
 import { queryKeys } from "@/lib/api/query-keys";
 import { formatDateTime } from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
+import type { LotAdminSummary } from "@/types/api";
 
 export default function DecisionsPage() {
   const client = useQueryClient();
-  const { data, isPending, error, refetch } = useDecisions();
-  const [accepting, setAccepting] = useState<DecisionLot | null>(null);
-  const [relisting, setRelisting] = useState<DecisionLot | null>(null);
+  const [page, setPage] = useState(0);
+  const { data, isPending, error, refetch, isFetching } = useDecisions(page);
+  const [accepting, setAccepting] = useState<LotAdminSummary | null>(null);
+  const [relisting, setRelisting] = useState<LotAdminSummary | null>(null);
 
+  // Server order is by closing time then lot number — deliberately not re-sorted.
   const rows = data ?? [];
+  const hasMore = rows.length === DECISIONS_PAGE_SIZE;
 
-  // The lot summary carries the leader's user id but not their handle, so the
-  // top bid is fetched per row. The queue is short, so this stays cheap.
-  const leaders = useQueries({
-    queries: rows.map(({ lot }) => ({
-      queryKey: [...queryKeys.lotBids(lot.id), "top"],
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        listLotBids(lot.id, { limit: 1 }, signal),
-      staleTime: 60_000,
-    })),
-    combine: (results) => {
-      const map = new Map<string, string | null>();
-      rows.forEach(({ lot }, index) => {
-        map.set(lot.id, results[index]?.data?.items[0]?.bidder_handle ?? null);
-      });
-      return map;
-    },
-  });
+  // One extra call for the auction names and currencies these lots belong to.
+  // Cached across the app, so it is usually already in hand.
+  const { data: auctions } = useAuctions({ limit: 200 });
+  const auctionsById = new Map((auctions ?? []).map((a) => [a.id, a]));
+  const currencyFor = (lot: LotAdminSummary) =>
+    auctionsById.get(lot.auction_id)?.currency_code ?? "ZAR";
 
   const accept = useMutation({
     mutationFn: ({ lotId, reason }: { lotId: string; reason: string }) =>
       acceptReserve(lotId, reason),
     onSuccess: (lot) => {
-      void client.invalidateQueries({ queryKey: queryKeys.decisions });
+      void client.invalidateQueries({ queryKey: queryKeys.decisionsRoot });
       void client.invalidateQueries({ queryKey: queryKeys.lot(lot.id) });
       void client.invalidateQueries({ queryKey: queryKeys.lots(lot.auction_id) });
       toast.success(`"${lot.title}" is sold to the top bidder.`);
@@ -77,8 +74,19 @@ export default function DecisionsPage() {
         <TableSkeleton columns={7} />
       ) : rows.length === 0 ? (
         <EmptyState
-          title="Nothing waiting on you"
-          description="Lots that end below their reserve land here. Check back after an auction closes."
+          title={page === 0 ? "Nothing waiting on you" : "No more to review"}
+          description={
+            page === 0
+              ? "Lots that end below their reserve land here. Check back after an auction closes."
+              : "You have reached the end of the queue."
+          }
+          action={
+            page > 0 ? (
+              <Button variant="secondary" onClick={() => setPage(0)}>
+                Back to the first page
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         <>
@@ -117,8 +125,9 @@ export default function DecisionsPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => {
-                  const { lot, auction } = row;
+                {rows.map((lot) => {
+                  const currency = currencyFor(lot);
+                  const auction = auctionsById.get(lot.auction_id);
                   const shortfall = Math.max(
                     (lot.reserve_price_minor ?? 0) - (lot.current_bid_minor ?? 0),
                     0,
@@ -135,24 +144,24 @@ export default function DecisionsPage() {
                       </td>
                       <td className="px-2.5 py-1.5">
                         <Link
-                          href={`/auctions/${auction.id}?tab=lots`}
+                          href={`/auctions/${lot.auction_id}?tab=lots`}
                           className="text-xs text-text-muted hover:underline"
                         >
-                          {auction.name}
+                          {auction?.name ?? "Open auction"}
                         </Link>
                       </td>
                       <td className="tnum px-2.5 py-1.5 text-right">
-                        {formatMoney(lot.reserve_price_minor, auction.currency_code)}
+                        {formatMoney(lot.reserve_price_minor, currency)}
                       </td>
                       <td className="tnum px-2.5 py-1.5 text-right">
-                        {formatMoney(lot.current_bid_minor, auction.currency_code)}
+                        {formatMoney(lot.current_bid_minor, currency)}
                       </td>
                       <td className="tnum px-2.5 py-1.5 text-right font-semibold text-warning-ink">
-                        {formatMoney(shortfall, auction.currency_code)}
+                        {formatMoney(shortfall, currency)}
                       </td>
                       <td className="px-2.5 py-1.5">
-                        {leaders.get(lot.id) ?? (
-                          <span className="text-text-muted">·</span>
+                        {lot.current_leader_handle ?? (
+                          <span className="text-text-muted">—</span>
                         )}
                       </td>
                       <td className="tnum px-2.5 py-1.5 text-xs text-text-muted">
@@ -163,14 +172,14 @@ export default function DecisionsPage() {
                           <Button
                             size="sm"
                             variant="primary"
-                            onClick={() => setAccepting(row)}
+                            onClick={() => setAccepting(lot)}
                           >
                             Accept
                           </Button>
                           <Button
                             size="sm"
                             variant="secondary"
-                            onClick={() => setRelisting(row)}
+                            onClick={() => setRelisting(lot)}
                           >
                             Relist
                           </Button>
@@ -181,6 +190,29 @@ export default function DecisionsPage() {
                 })}
               </tbody>
             </table>
+          </div>
+
+          <div className="mt-3 flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={page === 0}
+              onClick={() => setPage((p) => Math.max(p - 1, 0))}
+            >
+              Previous
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={!hasMore}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Next
+            </Button>
+            <span className="tnum text-xs text-text-muted">
+              Page {page + 1}
+              {isFetching && " · loading"}
+            </span>
           </div>
         </>
       )}
@@ -197,48 +229,46 @@ export default function DecisionsPage() {
           accepting ? (
             <div className="flex flex-col gap-2">
               <p>
-                <strong>{accepting.lot.title}</strong> closed below its reserve.
+                <strong>{accepting.title}</strong> closed below its reserve.
                 Accepting promotes the top bid to won and marks the lot sold.
               </p>
               <dl className="tnum grid grid-cols-2 gap-1 rounded border border-border bg-surface-sunken px-3 py-2">
                 <dt className="text-text-muted">Reserve</dt>
                 <dd className="text-right">
                   {formatMoney(
-                    accepting.lot.reserve_price_minor,
-                    accepting.auction.currency_code,
+                    accepting.reserve_price_minor,
+                    currencyFor(accepting),
                   )}
                 </dd>
                 <dt className="text-text-muted">Top bid</dt>
                 <dd className="text-right">
                   {formatMoney(
-                    accepting.lot.current_bid_minor,
-                    accepting.auction.currency_code,
+                    accepting.current_bid_minor,
+                    currencyFor(accepting),
                   )}
                 </dd>
-                <dt className="font-semibold text-warning-ink">
-                  You give up
-                </dt>
+                <dt className="font-semibold text-warning-ink">You give up</dt>
                 <dd className="text-right font-semibold text-warning-ink">
                   {formatMoney(
                     Math.max(
-                      (accepting.lot.reserve_price_minor ?? 0) -
-                        (accepting.lot.current_bid_minor ?? 0),
+                      (accepting.reserve_price_minor ?? 0) -
+                        (accepting.current_bid_minor ?? 0),
                       0,
                     ),
-                    accepting.auction.currency_code,
+                    currencyFor(accepting),
                   )}
                 </dd>
               </dl>
               <p>
-                {leaders.get(accepting.lot.id) ?? "The top bidder"} wins the lot
-                at their bid. This cannot be undone.
+                {accepting.current_leader_handle ?? "The top bidder"} wins the
+                lot at their bid. This cannot be undone.
               </p>
             </div>
           ) : null
         }
         onConfirm={({ reason }) =>
           accepting
-            ? accept.mutateAsync({ lotId: accepting.lot.id, reason })
+            ? accept.mutateAsync({ lotId: accepting.id, reason })
             : undefined
         }
       />
@@ -248,10 +278,7 @@ export default function DecisionsPage() {
         onClose={() => setRelisting(null)}
         lot={
           relisting
-            ? {
-                id: relisting.lot.id,
-                auction_id: relisting.lot.auction_id,
-              }
+            ? { id: relisting.id, auction_id: relisting.auction_id }
             : { id: "", auction_id: "" }
         }
       />

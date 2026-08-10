@@ -1,6 +1,5 @@
 "use client";
 
-import { useQueries } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -11,9 +10,7 @@ import { EmptyState, ErrorState, TableSkeleton } from "@/components/ui/Feedback"
 import { Input, Select } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { listLots } from "@/lib/api/endpoints";
 import { useAuctions } from "@/lib/api/queries";
-import { queryKeys } from "@/lib/api/query-keys";
 import { errorMessage } from "@/lib/api/errors";
 import { formatDateTime } from "@/lib/format/datetime";
 import { AUCTION_STATUS_META } from "@/lib/format/status";
@@ -25,25 +22,6 @@ export default function AuctionsPage() {
   const [search, setSearch] = useState("");
 
   const { data, isPending, error, refetch } = useAuctions({ limit: 200 });
-
-  // AuctionAdminOut has no lot count, so it is fetched per row. Long stale time
-  // keeps this cheap; recorded in NOTES.md as a backend request.
-  const lotCounts = useQueries({
-    queries: (data ?? []).map((auction) => ({
-      queryKey: queryKeys.lots(auction.id),
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        listLots(auction.id, signal),
-      staleTime: 60_000,
-    })),
-    combine: (results) => {
-      const map = new Map<string, number | null>();
-      (data ?? []).forEach((auction, index) => {
-        const result = results[index];
-        map.set(auction.id, result?.data ? result.data.length : null);
-      });
-      return map;
-    },
-  });
 
   const rows = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -132,21 +110,17 @@ export default function AuctionsPage() {
         },
       },
       {
-        id: "lots",
+        id: "lot_count",
         header: "Lots",
-        enableSorting: false,
+        accessorFn: (row) => row.lot_count,
+        sortFn: "basic",
         meta: { width: "4.5rem", align: "right" },
-        cell: ({ row }) => {
-          const count = lotCounts.get(row.original.id);
-          return count === null || count === undefined ? (
-            <span className="text-text-muted">·</span>
-          ) : (
-            <span className="tnum">{count}</span>
-          );
-        },
+        cell: ({ row }) => (
+          <span className="tnum">{row.original.lot_count}</span>
+        ),
       },
     ],
-    [lotCounts],
+    [],
   );
 
   return (

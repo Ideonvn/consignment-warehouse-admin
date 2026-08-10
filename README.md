@@ -18,34 +18,40 @@ never modifies the backend**; requests for it are collected in
 - **Node.js 20.9+** (Next.js 16 minimum).
 - **The backend running locally.** From the backend repo:
   ```bash
-  make dev     # API on http://localhost:8000, Postgres, Valkey, MinIO
-  make seed    # seeded admin, bidders, and a live auction with lots
+  make dev-all # API on http://localhost:8000, Postgres, Valkey, MinIO, and the
+               # worker that closes lots when their clock runs out
+  make seed    # seeded superadmin, admin, bidders, and a live auction with lots
   ```
+  `make dev` alone is enough for everything except lots actually closing — the
+  monitor and the decisions queue need the worker running.
 - **MinIO up** — photo uploads go directly from the browser to object storage.
   `make dev` brings it up with the rest of the stack.
 
 Seeded accounts (while the backend runs with `APP_ENV=local`, **the OTP code is
 always `0000`**):
 
-| Number          | Role   |
-| --------------- | ------ |
-| `+27820000001`  | admin  |
-| `+27820000002`  | bidder |
-| `+27820000003`  | bidder |
-| `+27820000004`  | bidder |
+| Number          | Role       |
+| --------------- | ---------- |
+| `+27820000000`  | superadmin |
+| `+27820000001`  | admin      |
+| `+27820000002`  | bidder     |
+| `+27820000003`  | bidder     |
+| `+27820000004`  | bidder     |
+
+Role changes are superadmin-only, so use `+27820000000` to exercise them.
 
 ## Setup
 
 ```bash
 npm install
 cp .env.example .env.local   # defaults already match a local backend
-npm run dev                  # http://localhost:5173
+npm run dev                  # http://localhost:3100
 ```
 
-**Why 5173 and not 3000?** The backend's CORS allowlist contains only
-`http://localhost:3000` and `http://localhost:5173`, and 3000 belongs to the
-bidder-facing app. Running the portal on 5173 lets both apps talk to the same
-backend at once. `npm run start` uses the same port.
+**Why 3100?** The backend's CORS allowlist is `http://localhost:3000` for the
+bidder-facing app and `http://localhost:3100` for this portal, so both can talk
+to the same backend at once. `npm run start` uses the same port. Running the
+portal on any other port will make every request fail preflight.
 
 ## Environment variables
 
@@ -60,9 +66,9 @@ Both are documented in [.env.example](.env.example).
 
 | Command             | What it does                                        |
 | ------------------- | --------------------------------------------------- |
-| `npm run dev`       | Dev server on port 5173                             |
+| `npm run dev`       | Dev server on port 3100                             |
 | `npm run build`     | Production build                                    |
-| `npm run start`     | Serve the production build on 5173                  |
+| `npm run start`     | Serve the production build on 3100                  |
 | `npm run lint`      | ESLint (includes the React Compiler rules)          |
 | `npm run typecheck` | `tsc --noEmit`                                      |
 

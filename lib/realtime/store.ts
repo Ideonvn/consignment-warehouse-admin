@@ -16,8 +16,10 @@ interface RealtimeState {
   status: ConnectionStatus;
   /** Lots currently subscribed on the open connection. */
   subscribedCount: number;
-  /** Server-imposed ceiling; larger auctions fall back to polling. */
+  /** Why the socket last fell back to REST, if it did. */
   lastError: string | null;
+  /** ms timestamp of the last gap the socket could not replay. */
+  lastGapAt: number | null;
   lastMessageAt: number | null;
   set: (patch: Partial<Omit<RealtimeState, "set">>) => void;
   reset: () => void;
@@ -27,6 +29,7 @@ export const useRealtimeStore = create<RealtimeState>((set) => ({
   status: "idle",
   subscribedCount: 0,
   lastError: null,
+  lastGapAt: null,
   lastMessageAt: null,
   set: (patch) => set(patch),
   reset: () =>
@@ -34,6 +37,7 @@ export const useRealtimeStore = create<RealtimeState>((set) => ({
       status: "idle",
       subscribedCount: 0,
       lastError: null,
+      lastGapAt: null,
       lastMessageAt: null,
     }),
 }));

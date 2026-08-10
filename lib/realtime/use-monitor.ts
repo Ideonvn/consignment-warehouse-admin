@@ -188,7 +188,15 @@ export function useAuctionMonitor(
         setRealtime({ status, lastError: detail ?? null }),
       onSubscribedCount: (count) => setRealtime({ subscribedCount: count }),
       onNeedsRefetch: (reason) => {
-        setRealtime({ lastError: reason });
+        // Recorded with a timestamp: this can happen while the socket is
+        // perfectly healthy, and the operator still deserves to know the
+        // figures were reconciled over the API rather than streamed.
+        setRealtime({ lastError: reason, lastGapAt: Date.now() });
+        // Drop the overlay before refetching. It was built from events that
+        // are now known to be incomplete, and since it takes precedence over
+        // the REST snapshot it would otherwise pin a stale price on screen —
+        // the exact gap this fallback exists to close.
+        setLive({});
         refetchLots();
       },
     });

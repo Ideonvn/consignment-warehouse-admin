@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { DataPoint, Panel } from "@/components/ui/Panel";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { errorMessage } from "@/lib/api/errors";
-import { useAuction, useLot, useLots } from "@/lib/api/queries";
+import { useAuction, useLot } from "@/lib/api/queries";
 import { formatDateTime } from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
 import { useSetAuctionContext } from "@/lib/ui/auction-context";
@@ -21,12 +21,6 @@ export function LotDetail({ lotId }: { lotId: string }) {
   const lotQuery = useLot(lotId);
   const lot = lotQuery.data;
   const auctionQuery = useAuction(lot?.auction_id);
-  // GET /admin/lots/{id} omits relisted_from_lot_id even though the summary
-  // shape carries it, so provenance is read from the auction's lot list.
-  const siblingsQuery = useLots(lot?.auction_id);
-  const relistedFrom =
-    siblingsQuery.data?.find((sibling) => sibling.id === lotId)
-      ?.relisted_from_lot_id ?? lot?.relisted_from_lot_id ?? null;
   useSetAuctionContext(auctionQuery.data);
   usePageTitle(lot ? `Lot ${lot.lot_number ?? ""} · ${lot.title}` : null);
 
@@ -80,11 +74,11 @@ export function LotDetail({ lotId }: { lotId: string }) {
         actions={<LotActions lot={lot} currency={currency} />}
       />
 
-      {relistedFrom && (
+      {lot.relisted_from_lot_id && (
         <Note tone="info" className="mb-3">
           This lot was relisted from{" "}
           <Link
-            href={`/lots/${relistedFrom}`}
+            href={`/lots/${lot.relisted_from_lot_id}`}
             className="font-medium underline"
           >
             an earlier lot
@@ -188,9 +182,9 @@ export function LotDetail({ lotId }: { lotId: string }) {
                   {lot.current_leader_user_id ? (
                     <Link
                       href={`/users/${lot.current_leader_user_id}`}
-                      className="font-mono text-xs underline"
+                      className="underline"
                     >
-                      {lot.current_leader_user_id.slice(0, 8)}…
+                      {lot.current_leader_handle ?? "View bidder"}
                     </Link>
                   ) : (
                     <span className="text-text-muted">none</span>

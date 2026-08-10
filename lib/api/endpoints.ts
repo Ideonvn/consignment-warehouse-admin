@@ -33,6 +33,7 @@ import {
   type LotAdminDetail,
   type LotAdminSummary,
   type LotImageAdmin,
+  type LotStatus,
   type PresignRequestInput,
   type PresignResult,
   type RelistLotInput,
@@ -165,6 +166,33 @@ export function listLots(
 ): Promise<LotAdminSummary[]> {
   return apiRequest(`/admin/auctions/${auctionId}/lots`, {
     schema: lotListSchema,
+    signal,
+  });
+}
+
+export interface ListAdminLotsParams {
+  status?: LotStatus | "";
+  auctionId?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Lots across every auction, filtered by status. Already ordered by
+ * `effective_ends_at` then `lot_number`, so callers must not re-sort.
+ */
+export function listAdminLots(
+  params: ListAdminLotsParams = {},
+  signal?: AbortSignal,
+): Promise<LotAdminSummary[]> {
+  return apiRequest("/admin/lots", {
+    schema: lotListSchema,
+    query: {
+      status: params.status || undefined,
+      auction_id: params.auctionId || undefined,
+      limit: params.limit ?? 50,
+      offset: params.offset ?? 0,
+    },
     signal,
   });
 }

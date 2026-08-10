@@ -7,11 +7,7 @@ import {
   type UseQueryOptions,
 } from "@tanstack/react-query";
 import { useSessionStore } from "@/lib/auth";
-import type {
-  AuctionAdmin,
-  LotAdminSummary,
-  UserRole,
-} from "@/types/api";
+import type { AuctionAdmin, LotAdminSummary, UserRole } from "@/types/api";
 import * as api from "./endpoints";
 import { queryKeys } from "./query-keys";
 
@@ -118,50 +114,48 @@ export function useUser(userId: string | undefined) {
 
 /* -------------------------------------------------------------- decisions */
 
-export interface DecisionLot {
-  lot: LotAdminSummary;
-  auction: AuctionAdmin;
-}
+export const DECISIONS_PAGE_SIZE = 50;
 
 /**
- * Every lot sitting in `ended_reserve_not_met`, across every auction.
- *
- * There is no cross-auction lot endpoint, so this fans out over the auctions
- * that could plausibly hold one (anything past draft/scheduled). Recorded in
- * NOTES.md as a backend request.
+ * Lots waiting on a decision, straight from the cross-auction lots endpoint.
+ * The server returns them ordered by closing time, so nothing is re-sorted
+ * here — one call, whatever the number of auctions.
  */
-export function useDecisions() {
+export function useDecisions(page = 0) {
   const enabled = useAuthed();
-  return useQuery({
-    queryKey: queryKeys.decisions,
+  return useQuery<LotAdminSummary[]>({
+    queryKey: queryKeys.decisions(page),
     enabled,
     staleTime: 60_000,
-    queryFn: async ({ signal }) => {
-      const auctions = await api.listAuctions({ limit: 200 }, signal);
-      const candidates = auctions.filter(
-        (a) => a.status === "live" || a.status === "ended" || a.status === "settled",
-      );
-      const results = await Promise.all(
-        candidates.map(async (auction) => {
-          const lots = await api.listLots(auction.id, signal);
-          return lots
-            .filter((lot) => lot.status === "ended_reserve_not_met")
-            .map((lot) => ({ lot, auction }));
-        }),
-      );
-      return results
-        .flat()
-        .sort((a, b) =>
-          (a.lot.effective_ends_at ?? "").localeCompare(
-            b.lot.effective_ends_at ?? "",
-          ),
-        );
-    },
+    placeholderData: (previous) => previous,
+    queryFn: ({ signal }) =>
+      api.listAdminLots(
+        {
+          status: "ended_reserve_not_met",
+          limit: DECISIONS_PAGE_SIZE,
+          offset: page * DECISIONS_PAGE_SIZE,
+        },
+        signal,
+      ),
   });
 }
 
+/**
+ * Badge count for the sidebar. Its own small query so the badge does not depend
+ * on which page of the queue the operator happens to be looking at.
+ */
 export function useDecisionCount(): number {
-  const { data } = useDecisions();
+  const enabled = useAuthed();
+  const { data } = useQuery<LotAdminSummary[]>({
+    queryKey: queryKeys.decisionCount,
+    enabled,
+    staleTime: 60_000,
+    queryFn: ({ signal }) =>
+      api.listAdminLots(
+        { status: "ended_reserve_not_met", limit: 200 },
+        signal,
+      ),
+  });
   return data?.length ?? 0;
 }
 
@@ -173,7 +167,7 @@ export function useLotInvalidation() {
   return (lot: { id: string; auction_id: string }) => {
     void client.invalidateQueries({ queryKey: queryKeys.lot(lot.id) });
     void client.invalidateQueries({ queryKey: queryKeys.lots(lot.auction_id) });
-    void client.invalidateQueries({ queryKey: queryKeys.decisions });
+    void client.invalidateQueries({ queryKey: queryKeys.decisionsRoot });
   };
 }
 

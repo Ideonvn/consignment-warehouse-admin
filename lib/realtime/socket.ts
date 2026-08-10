@@ -8,7 +8,7 @@
  *  - the server pings every 30s and we must answer with a pong, and it drops
  *    idle connections after 120s
  *  - the highest `sequence` per lot is tracked so a reconnect can ask for
- *    everything after it
+ *    everything after it, per lot, via `after_sequences`
  */
 import { mintWsTicket } from "@/lib/api/endpoints";
 import {
@@ -19,10 +19,11 @@ import {
 import type { ConnectionStatus } from "./store";
 
 export const MAX_SUBSCRIBED_LOTS = 200;
-/** UUIDs are 36 chars; 80 per message keeps us well inside the 4 KB cap. */
-const LOT_IDS_PER_MESSAGE = 80;
-/** Bound the reconnect burst so we never trip the 120 messages/minute limit. */
-const MAX_SUBSCRIBE_MESSAGES = 30;
+/**
+ * UUIDs are 36 chars and the per-lot `after_sequences` map repeats each one, so
+ * 40 per message keeps a resuming subscribe inside the 4 KB cap.
+ */
+const LOT_IDS_PER_MESSAGE = 40;
 
 const KEEPALIVE_MS = 45_000;
 const MAX_BACKOFF_MS = 30_000;
@@ -204,8 +205,10 @@ export class RealtimeClient {
   }
 
   /**
-   * Subscribes in chunks, grouped by the sequence each lot should resume from,
-   * so a reconnect catches up in the same round trip where it can.
+   * Subscribes in chunks, each carrying the per-lot `after_sequences` map so a
+   * reconnect resumes every lot from its own point in the same round trip.
+   * Sequences are per lot, so a single scalar for a batch is always wrong for
+   * some of them — the map form is the one to use.
    */
   private sendSubscriptions() {
     if (this.lotIds.length === 0) {
@@ -213,38 +216,24 @@ export class RealtimeClient {
       return;
     }
 
-    const groups = new Map<number, string[]>();
-    for (const lotId of this.lotIds) {
-      const sequence = this.lastSequence.get(lotId) ?? 0;
-      const bucket = groups.get(sequence);
-      if (bucket) bucket.push(lotId);
-      else groups.set(sequence, [lotId]);
-    }
-
-    let messages = 0;
-    let overflowed = false;
-    for (const [sequence, ids] of groups) {
-      for (let i = 0; i < ids.length; i += LOT_IDS_PER_MESSAGE) {
-        if (messages >= MAX_SUBSCRIBE_MESSAGES) {
-          overflowed = true;
-          break;
-        }
-        const chunk = ids.slice(i, i + LOT_IDS_PER_MESSAGE);
-        this.send(
-          sequence > 0
-            ? { action: "subscribe", lot_ids: chunk, after_sequence: sequence }
-            : { action: "subscribe", lot_ids: chunk },
-        );
-        messages += 1;
+    for (let i = 0; i < this.lotIds.length; i += LOT_IDS_PER_MESSAGE) {
+      const chunk = this.lotIds.slice(i, i + LOT_IDS_PER_MESSAGE);
+      const afterSequences: Record<string, number> = {};
+      for (const lotId of chunk) {
+        const sequence = this.lastSequence.get(lotId) ?? 0;
+        if (sequence > 0) afterSequences[lotId] = sequence;
       }
-      if (overflowed) break;
-    }
-
-    if (overflowed) {
-      this.handlers.onNeedsRefetch(
-        "Too many distinct catch-up points to replay; refreshed over the API instead",
+      this.send(
+        Object.keys(afterSequences).length > 0
+          ? {
+              action: "subscribe",
+              lot_ids: chunk,
+              after_sequences: afterSequences,
+            }
+          : { action: "subscribe", lot_ids: chunk },
       );
     }
+
     this.handlers.onSubscribedCount(this.lotIds.length);
   }
 

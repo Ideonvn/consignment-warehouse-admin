@@ -232,7 +232,7 @@ export function RelistDialog({
       void client.invalidateQueries({
         queryKey: queryKeys.lots(created.auction_id),
       });
-      void client.invalidateQueries({ queryKey: queryKeys.decisions });
+      void client.invalidateQueries({ queryKey: queryKeys.decisionsRoot });
       toast.success(`Relisted as lot ${created.lot_number ?? ""}.`);
       onClose();
       router.push(`/lots/${created.id}`);
