@@ -234,7 +234,7 @@ export function AuctionMonitor({ auctionId }: { auctionId: string }) {
                         className={cn(
                           "border-t border-border",
                           liveState && "flash-update",
-                          lot.status === "ended_reserve_not_met" && "bg-[#fffbeb]",
+                          lot.status === "ended_reserve_not_met" && "bg-warning-tint",
                         )}
                       >
                         <td className="px-2.5 py-1.5">
@@ -268,7 +268,7 @@ export function AuctionMonitor({ auctionId }: { auctionId: string }) {
                               className={cn(
                                 "font-semibold text-warning-ink",
                                 justExtended &&
-                                  "rounded bg-warning px-1 text-white",
+                                  "rounded bg-warning px-1 text-warning-fill-ink",
                               )}
                               title={
                                 justExtended

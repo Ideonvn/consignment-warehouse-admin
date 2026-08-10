@@ -32,7 +32,7 @@ export class ErrorBoundary extends Component<Props, State> {
     return (
       <div
         role="alert"
-        className="flex flex-col items-start gap-3 rounded border border-danger bg-[#fef2f2] px-4 py-4"
+        className="flex flex-col items-start gap-3 rounded border border-danger bg-danger-tint px-4 py-4"
       >
         <div>
           <p className="text-sm font-semibold text-danger-ink">

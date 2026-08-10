@@ -142,7 +142,7 @@ export function CommandPalette() {
         if (event.target === dialogRef.current) setOpen(false);
       }}
       aria-label="Command palette"
-      className="m-auto w-[calc(100vw-2rem)] max-w-lg rounded-lg border border-border bg-surface p-0 text-text shadow-2xl backdrop:bg-black/40"
+      className="m-auto w-[calc(100vw-2rem)] max-w-lg rounded-lg border border-border bg-surface p-0 text-text shadow-2xl backdrop:bg-scrim"
     >
       <div className="border-b border-border p-2">
         <input
@@ -185,7 +185,7 @@ export function CommandPalette() {
                 onClick={() => go(item)}
                 className={cn(
                   "flex w-full items-center justify-between gap-3 rounded px-2 py-1.5 text-left text-sm",
-                  index === clamped ? "bg-[#eff6ff]" : "hover:bg-surface-sunken",
+                  index === clamped ? "bg-info-tint" : "hover:bg-surface-sunken",
                 )}
               >
                 <span className="min-w-0">

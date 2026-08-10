@@ -74,6 +74,33 @@ export function MenuIcon(props: IconProps) {
   );
 }
 
+export function SunIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="8" cy="8" r="3" />
+      <path d="M8 1.5v1.5M8 13v1.5M1.5 8h1.5M13 8h1.5" />
+      <path d="M3.4 3.4l1 1M11.6 11.6l1 1M12.6 3.4l-1 1M4.4 11.6l-1 1" />
+    </Svg>
+  );
+}
+
+export function MoonIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M13 9.4A5.5 5.5 0 0 1 6.6 3a5.5 5.5 0 1 0 6.4 6.4z" />
+    </Svg>
+  );
+}
+
+export function SystemIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="1.5" y="3" width="13" height="8" rx="1" />
+      <path d="M6 13.5h4" />
+    </Svg>
+  );
+}
+
 export function MonitorIcon(props: IconProps) {
   return (
     <Svg {...props}>

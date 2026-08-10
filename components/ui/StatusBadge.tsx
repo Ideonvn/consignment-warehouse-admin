@@ -18,10 +18,10 @@ import { cn } from "@/lib/utils";
 
 const TONES: Record<Tone, string> = {
   neutral: "bg-surface-sunken text-text-muted border-border-strong",
-  info: "bg-[#eff6ff] text-accent-strong border-[#bfdbfe]",
-  success: "bg-[#f0fdf4] text-success-ink border-[#bbf7d0]",
-  warning: "bg-[#fffbeb] text-warning-ink border-[#fde68a]",
-  danger: "bg-[#fef2f2] text-danger-ink border-[#fecaca]",
+  info: "bg-info-tint text-accent-strong border-info-tint-border",
+  success: "bg-success-tint text-success-ink border-success-tint-border",
+  warning: "bg-warning-tint text-warning-ink border-warning-tint-border",
+  danger: "bg-danger-tint text-danger-ink border-danger-tint-border",
   accent: "bg-accent text-accent-ink border-accent",
 };
 

@@ -266,11 +266,11 @@ export function LotsTab({ auction }: { auction: AuctionAdmin }) {
           onSelectionChange={setSelection}
           onRowClick={(row) => router.push(`/lots/${row.id}`)}
           rowClassName={(row) =>
-            row.status === "ended_reserve_not_met" ? "bg-[#fffbeb]" : undefined
+            row.status === "ended_reserve_not_met" ? "bg-warning-tint" : undefined
           }
           toolbar={
             selectedCount > 0 ? (
-              <div className="flex items-center gap-3 border-b border-border bg-[#eff6ff] px-3 py-1.5 text-xs">
+              <div className="flex items-center gap-3 border-b border-border bg-info-tint px-3 py-1.5 text-xs">
                 <span className="font-medium">
                   {selectedCount} lot{selectedCount === 1 ? "" : "s"} selected
                 </span>

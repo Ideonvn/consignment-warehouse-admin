@@ -243,7 +243,7 @@ export function LotImages({ lotId }: { lotId: string }) {
         className={cn(
           "mb-3 rounded border border-dashed px-3 py-4 text-center text-sm",
           dragOver
-            ? "border-accent bg-[#eff6ff] text-accent-strong"
+            ? "border-accent bg-info-tint text-accent-strong"
             : "border-border-strong text-text-muted",
         )}
       >

@@ -58,7 +58,7 @@ export function Dialog({
       }}
       className={cn(
         "m-auto w-[calc(100vw-2rem)] rounded-lg border border-border bg-surface p-0 text-text shadow-xl",
-        "backdrop:bg-black/40",
+        "backdrop:bg-scrim",
         WIDTHS[width],
       )}
       aria-labelledby="dialog-title"

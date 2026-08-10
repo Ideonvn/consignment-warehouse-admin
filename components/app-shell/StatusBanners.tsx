@@ -43,7 +43,7 @@ export function StatusBanners() {
     return (
       <div
         role="status"
-        className="flex items-center gap-2 border-b border-danger bg-[#fef2f2] px-3 py-1.5 text-xs text-danger-ink"
+        className="flex items-center gap-2 border-b border-danger bg-danger-tint px-3 py-1.5 text-xs text-danger-ink"
       >
         <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-danger" />
         <strong>Offline.</strong> Nothing on this screen is updating, and
@@ -56,7 +56,7 @@ export function StatusBanners() {
     return (
       <div
         role="status"
-        className="border-b border-[#bbf7d0] bg-[#f0fdf4] px-3 py-1.5 text-xs text-success-ink"
+        className="border-b border-success-tint-border bg-success-tint px-3 py-1.5 text-xs text-success-ink"
       >
         Back online — everything on screen has been refreshed.
       </div>
@@ -67,7 +67,7 @@ export function StatusBanners() {
     return (
       <div
         role="status"
-        className="border-b border-[#fde68a] bg-[#fffbeb] px-3 py-1.5 text-xs text-warning-ink"
+        className="border-b border-warning-tint-border bg-warning-tint px-3 py-1.5 text-xs text-warning-ink"
       >
         This device&apos;s clock is {formatCountdown(Math.abs(offset))}{" "}
         {offset > 0 ? "behind" : "ahead of"} the server. Countdowns here are

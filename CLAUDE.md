@@ -22,6 +22,11 @@ way. Colour tokens live in `app/globals.css`; status colours are semantic and
 `StatusBadge` is the only thing allowed to map a status to a colour, so the same
 state never looks like two different things on two screens.
 
+**Light is the default and the reference.** A dark theme exists for evening
+readability, nothing more — same density, same layout, same semantics. It is not
+a second design and not licence to drift toward the bidder app's dark photo-led
+styling. See "Theming" below before touching a colour.
+
 ## Stack, and why
 
 Locked. Each of these earns its place:
@@ -156,6 +161,100 @@ enforced by the storage policy itself, so an oversized file fails at the storage
 step even if the client-side check is bypassed — that rejection needs different
 wording from an API validation error, because one means the bytes never landed.
 
+## Theming
+
+Three settings — Light / Dark / System — with **Light as the default**, so the
+existing look is what you get out of the box.
+
+**Adding a theme is a token override, not a restructure.** `app/globals.css`
+holds raw tokens in `:root` and maps them to `--color-*` through
+`@theme inline`. Dark therefore overrides the raw tokens under
+`[data-theme="dark"]` and every existing utility class follows automatically.
+Do not restructure that; do not reach for `dark:` variants in components.
+
+**Nothing may hardcode a colour.** Components used to carry literal hexes for
+tinted surfaces (`bg-[#eff6ff]` and friends). Those bypass the token layer
+entirely, so they would have stayed light-on-light in dark mode — they are now
+`--info-tint`, `--warning-tint`, `--danger-tint`, `--success-tint` and their
+`*-tint-border` partners. If you find yourself typing a hex in a component,
+the token is missing; add it in both themes.
+
+### The `*-ink` inversion — the trap
+
+`--danger-ink`, `--warning-ink`, `--success-ink` and `--accent-ink-on-light` are
+**darkened** in light, because the raw status hues are too light for AA text on
+white. **In dark that reasoning reverses exactly**: those darkened readings fail
+against a dark surface, so the dark theme makes them *lighter* than the raw
+hues. `--border-strong` has the same history in the other direction — it was
+darkened from `#C7CAD1` to `#898C94` in light because 1.64:1 is nowhere near the
+3:1 WCAG 1.4.11 wants for an input boundary, and dark needed its own value
+checked the same way.
+
+Two token pairs exist because one colour cannot do two jobs:
+
+- `--accent` (button fill, contrasts with its own ink) vs `--focus` (ring,
+  contrasts with the page). They coincide in light; in dark the ring brightens
+  to `#5A93F7` because `#2563EB` is only 2.4:1 against the dark canvas.
+- `--warning-fill-ink` / `--danger-fill-ink` for text sitting *on* a solid
+  status fill, as `--accent-ink` is for the accent fill.
+
+### Verify numerically, in both themes
+
+4.5:1 for body text, 3:1 for non-text boundaries and large text. **Do not
+eyeball it** — the originally specified `--border-strong` failed by more than
+half, and white-on-amber was shipping at 3.19:1 on the sidebar decision badge
+and the monitor's extension marker until the theme work measured it. Measured
+ratios for the pairings that matter (light / dark):
+
+| Pairing | Light | Dark |
+| --- | --- | --- |
+| body text on surface | 18.11 | 14.05 |
+| muted text on sunken (table headers) | 5.43 | 8.14 |
+| link text on surface | 6.70 | 8.20 |
+| primary button ink on fill | 5.17 | 5.17 |
+| danger button ink on fill | 4.83 | 4.83 |
+| ink on amber fill (decision badge) | 4.86 | 4.86 |
+| danger ink on danger tint | 7.60 | 8.22 |
+| warning ink on warning tint | 6.84 | 8.55 |
+| success ink on success tint | 4.79 | 7.96 |
+| input outline vs surface | 3.36 | 3.59 |
+| focus ring vs canvas | 4.86 | 6.21 |
+| primary button fill vs surface | 5.17 | 3.30 |
+
+`StatusBadge` is the single status→colour map and all six tones stay legible and
+separable in both themes; the amber `ended_reserve_not_met` must stay easy to
+spot at night, since it is the one that needs a decision. Badge *borders* are
+decorative — the label text and dot carry the status, so 1.4.11's 3:1 does not
+bind there; they are held to a visibility floor instead.
+
+### No flash of the wrong theme
+
+The theme is applied by an inline script in `<head>` (`app/layout.tsx`), so it
+lands during head parsing, before anything paints. next-themes ships an
+equivalent script but renders it inside `<body>`, which is late enough for the
+body background to have painted — an operator opening this at night would get a
+white flash. The head script mirrors next-themes' resolution exactly (stored
+value, `system` resolved through `matchMedia`, default light) so the two never
+disagree. `<html>` carries `suppressHydrationWarning` because that script
+legitimately changes the element before React hydrates.
+
+`color-scheme` follows the active theme. That is what makes native date pickers,
+scrollbars and autofill follow it too — `DateTimeInput` and `MoneyInput` lean on
+native controls constantly, so getting this wrong is very visible.
+
+`next-themes` is the one dependency added for this. It is zero-dependency and
+handles the OS theme changing while the app is open, cross-tab sync, and the SSR
+mismatch. Hand-rolling all four is about a hundred lines of fiddly code with a
+nasty failure mode.
+
+### Where the control lives
+
+Three segmented buttons in the app shell's top bar, next to the connection
+indicator, showing which is active and what System currently resolves to. An
+operator switching at dusk reaches it in one click. It is deliberately **not** on
+a settings or profile screen — there is no profile screen in this app (a
+recorded known gap) and one should not be created for this.
+
 ## Structure
 
 ```
@@ -222,6 +321,11 @@ Deliberate, with reasons — see `NOTES.md` for the full list.
   reads `X-Next-Cursor` / `X-Has-More`, but the lot screen loads only the first
   50 and says so. Nothing in the operator's day has needed deeper history.
 - **No profile screen.** `PATCH /auth/me` is typed in `types/api.ts` and unused.
+- **Theme is stored per device, in `localStorage` only** (`cw.admin.theme`) —
+  not on the user record. That is a decision, not a missing feature: the same
+  operator uses a warehouse laptop in daylight and a phone at night, so syncing
+  the setting would carry the wrong choice to the wrong device. It also means no
+  backend field and no profile screen are needed for it.
 - **The last-superadmin guard is unreachable through the role endpoint.** With
   one superadmin left, the only account that could demote them is their own, and
   the self-change 409 fires first. The guard is real and reachable through

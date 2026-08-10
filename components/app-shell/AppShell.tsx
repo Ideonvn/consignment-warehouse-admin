@@ -11,6 +11,7 @@ import { usePaletteStore } from "@/lib/ui/palette";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ConnectionIndicator } from "./ConnectionIndicator";
 import { StatusBanners } from "./StatusBanners";
+import { ThemeToggle } from "./ThemeToggle";
 import { MenuIcon } from "./icons";
 import { Sidebar } from "./Sidebar";
 
@@ -76,6 +77,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </kbd>
           </button>
           <ConnectionIndicator />
+          <ThemeToggle />
           {user && (
             <span className="hidden text-xs text-text-muted lg:inline">
               {[user.first_name, user.last_name].filter(Boolean).join(" ") ||
@@ -101,7 +103,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <button
               type="button"
               aria-label="Close navigation"
-              className="absolute inset-0 bg-black/40"
+              className="absolute inset-0 bg-scrim"
               onClick={() => setDrawerOpen(false)}
             />
             <div className="relative h-full w-56 shadow-xl">

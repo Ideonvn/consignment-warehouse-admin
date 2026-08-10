@@ -14,15 +14,15 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const VARIANTS: Record<Variant, string> = {
   primary:
-    "bg-accent text-accent-ink border-accent hover:bg-[#1d4ed8] disabled:bg-accent/50 disabled:border-accent/50",
+    "bg-accent text-accent-ink border-accent hover:bg-accent-hover disabled:bg-accent/50 disabled:border-accent/50",
   secondary:
     "bg-surface text-text border-border-strong hover:bg-surface-sunken disabled:text-text-muted",
   ghost:
     "bg-transparent text-text border-transparent hover:bg-surface-sunken disabled:text-text-muted",
   danger:
-    "bg-danger text-white border-danger hover:bg-[#b91c1c] disabled:bg-danger/50 disabled:border-danger/50",
+    "bg-danger text-danger-fill-ink border-danger hover:bg-danger-hover disabled:bg-danger/50 disabled:border-danger/50",
   warning:
-    "bg-surface text-warning-ink border-warning hover:bg-[#fffbeb] disabled:opacity-50",
+    "bg-surface text-warning-ink border-warning hover:bg-warning-tint disabled:opacity-50",
 };
 
 const SIZES: Record<Size, string> = {

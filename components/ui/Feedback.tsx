@@ -80,7 +80,7 @@ export function ErrorState({
   return (
     <div
       role="alert"
-      className="flex flex-col items-start gap-2 rounded border border-danger bg-[#fef2f2] px-4 py-3"
+      className="flex flex-col items-start gap-2 rounded border border-danger bg-danger-tint px-4 py-3"
     >
       <p className="text-sm font-semibold text-danger-ink">{title}</p>
       <p className="text-sm text-danger-ink">{message}</p>
@@ -111,9 +111,9 @@ export function Note({
     <div
       className={cn(
         "rounded border px-3 py-2 text-sm",
-        tone === "info" && "border-[#bfdbfe] bg-[#eff6ff] text-text",
-        tone === "warning" && "border-[#fde68a] bg-[#fffbeb] text-warning-ink",
-        tone === "danger" && "border-[#fecaca] bg-[#fef2f2] text-danger-ink",
+        tone === "info" && "border-info-tint-border bg-info-tint text-text",
+        tone === "warning" && "border-warning-tint-border bg-warning-tint text-warning-ink",
+        tone === "danger" && "border-danger-tint-border bg-danger-tint text-danger-ink",
         className,
       )}
     >

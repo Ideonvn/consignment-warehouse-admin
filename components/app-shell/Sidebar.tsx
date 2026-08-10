@@ -94,7 +94,7 @@ export function Sidebar({
             {item.badge ? (
               <span
                 className={cn(
-                  "tnum ml-auto rounded-full bg-warning px-1.5 py-0.5 text-[10px] font-semibold text-white",
+                  "tnum ml-auto rounded-full bg-warning px-1.5 py-0.5 text-[10px] font-semibold text-warning-fill-ink",
                   expanded ? "" : "hidden xl:inline-block",
                 )}
                 aria-label={`${item.badge} awaiting a decision`}
@@ -128,7 +128,7 @@ export function Sidebar({
             className={cn(
               "flex items-center gap-2.5 rounded px-2.5 py-1.5 text-sm",
               active
-                ? "bg-[#eff6ff] font-semibold text-accent-strong"
+                ? "bg-info-tint font-semibold text-accent-strong"
                 : "text-text hover:bg-surface-sunken",
             )}
           >

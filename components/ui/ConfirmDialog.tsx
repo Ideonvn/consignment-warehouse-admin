@@ -148,7 +148,7 @@ export function ConfirmDialog({
         {error && (
           <p
             role="alert"
-            className="rounded border border-danger bg-[#fef2f2] px-2 py-1.5 text-sm text-danger-ink"
+            className="rounded border border-danger bg-danger-tint px-2 py-1.5 text-sm text-danger-ink"
           >
             {error}
           </p>

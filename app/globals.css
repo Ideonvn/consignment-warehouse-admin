@@ -3,8 +3,18 @@
 /*
  * Consignment Warehouse — admin portal design tokens.
  * Light, dense, professional. Deliberately NOT the dark, photo-led consumer app.
+ *
+ * Light is the default and the reference. Dark exists for evening readability
+ * only — same density, same table-first layout, same semantics. It is not a
+ * second design.
+ *
+ * Raw tokens live here; `@theme inline` below maps them to `--color-*` so every
+ * utility class follows automatically. Adding a theme therefore means
+ * overriding raw tokens under a selector, nothing more.
  */
 :root {
+  color-scheme: light;
+
   --bg: #f7f8fa;
   --surface: #ffffff;
   --surface-sunken: #f0f1f4;
@@ -21,11 +31,98 @@
   --success: #16a34a;
 
   /* Ink variants: the raw status hues are too light for AA text on white,
-     so badges and inline status text use these darker readings instead. */
+     so badges and inline status text use these darker readings instead.
+     In dark this reasoning reverses exactly — see the .dark block. */
   --danger-ink: #991b1b;
   --warning-ink: #92400e;
   --success-ink: #15803d;
   --accent-ink-on-light: #1d4ed8;
+
+  /* Tinted surfaces for badges, notes, selected rows and dialog callouts.
+     These were hardcoded hexes in components until the dark theme landed;
+     going through tokens is what lets them follow the theme at all. */
+  --info-tint: #eff6ff;
+  --info-tint-border: #bfdbfe;
+  --success-tint: #f0fdf4;
+  --success-tint-border: #bbf7d0;
+  --warning-tint: #fffbeb;
+  --warning-tint-border: #fde68a;
+  --danger-tint: #fef2f2;
+  --danger-tint-border: #fecaca;
+
+  --accent-hover: #1d4ed8;
+  --danger-hover: #b91c1c;
+
+  /* Ink for text sitting ON a solid status fill, as --accent-ink is for the
+     accent fill. White on amber is only 3.19:1 — it was wrong on the sidebar
+     decision badge and the monitor's extension marker before the theme work,
+     in light mode too. The fills are identical in both themes, so these are
+     not overridden below. */
+  --warning-fill-ink: #3a1d02;
+  --danger-fill-ink: #ffffff;
+
+  /* The focus ring contrasts with the PAGE; --accent contrasts with its own
+     ink. Two different jobs, so two tokens — they only coincide in light. */
+  --focus: #2563eb;
+
+  /* Dialog scrim. */
+  --scrim: rgb(0 0 0 / 0.4);
+}
+
+/*
+ * Dark theme. Same tokens, re-measured — not a hue rotation.
+ *
+ * The relationships are preserved: sunken is darker than surface, surface sits
+ * above the canvas, so table headers and hover states keep reading the way they
+ * do in light. Every pairing below was verified numerically; the ratios are in
+ * CLAUDE.md.
+ */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #101216;
+  --surface: #191c22;
+  --surface-sunken: #0e1014;
+  --border: #2b303a;
+  /* 3.59:1 on surface, 3.94:1 on the canvas — the same 1.4.11 check that
+     forced #C7CAD1 -> #898C94 in light, run from the other direction. */
+  --border-strong: #6c7382;
+  --text: #e7e9ee;
+  --text-muted: #a2aab8;
+
+  /* Kept at the light values: these are FILLS carrying their own ink, and both
+     still clear 4.5:1 against white ink and 3:1 against the dark page. */
+  --accent: #2563eb;
+  --accent-ink: #ffffff;
+  --danger: #dc2626;
+  --warning: #d97706;
+  --success: #16a34a;
+
+  /* The inversion. These are darkened in light because the raw hues are too
+     light for AA text on white; on a dark surface that reasoning reverses and
+     the darkened readings fail, so they become LIGHTER than the raw hues. */
+  --danger-ink: #f79a9a;
+  --warning-ink: #f0b45c;
+  --success-ink: #5fd08a;
+  --accent-ink-on-light: #8fb4fb;
+
+  --info-tint: #111e33;
+  --info-tint-border: #2c4c7c;
+  --success-tint: #0e2a1c;
+  --success-tint-border: #22603c;
+  --warning-tint: #2c2110;
+  --warning-tint-border: #6b4e1b;
+  --danger-tint: #2b1517;
+  --danger-tint-border: #6e2e32;
+
+  --accent-hover: #1d4ed8;
+  --danger-hover: #b91c1c;
+
+  /* #2563EB is only 2.4:1 against the dark canvas, so the ring brightens even
+     though the button fill does not. */
+  --focus: #5a93f7;
+
+  --scrim: rgb(0 0 0 / 0.6);
 }
 
 @theme inline {
@@ -45,6 +142,19 @@
   --color-warning-ink: var(--warning-ink);
   --color-success: var(--success);
   --color-success-ink: var(--success-ink);
+  --color-info-tint: var(--info-tint);
+  --color-info-tint-border: var(--info-tint-border);
+  --color-success-tint: var(--success-tint);
+  --color-success-tint-border: var(--success-tint-border);
+  --color-warning-tint: var(--warning-tint);
+  --color-warning-tint-border: var(--warning-tint-border);
+  --color-danger-tint: var(--danger-tint);
+  --color-danger-tint-border: var(--danger-tint-border);
+  --color-accent-hover: var(--accent-hover);
+  --color-danger-hover: var(--danger-hover);
+  --color-warning-fill-ink: var(--warning-fill-ink);
+  --color-danger-fill-ink: var(--danger-fill-ink);
+  --color-scrim: var(--scrim);
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
@@ -84,7 +194,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--focus);
     outline-offset: 1px;
   }
 
