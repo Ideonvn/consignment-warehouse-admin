@@ -2,6 +2,8 @@
  * A stable UUID per browser. The backend ties refresh-token families to it, so
  * it must survive reloads and must not be regenerated per tab.
  */
+import { randomUuid } from "@/lib/utils";
+
 const STORAGE_KEY = "cw.admin.device_id";
 
 let cached: string | null = null;
@@ -14,7 +16,7 @@ export function getDeviceId(): string {
   }
   let id = window.localStorage.getItem(STORAGE_KEY);
   if (!id || !isUuid(id)) {
-    id = crypto.randomUUID();
+    id = randomUuid();
     window.localStorage.setItem(STORAGE_KEY, id);
   }
   cached = id;

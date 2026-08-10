@@ -23,7 +23,7 @@ import {
   validateImageFile,
 } from "@/lib/api/upload";
 import { ALLOWED_IMAGE_TYPES } from "@/types/api";
-import { cn } from "@/lib/utils";
+import { cn, randomUuid } from "@/lib/utils";
 import type { LotImageAdmin } from "@/types/api";
 
 interface UploadItem {
@@ -61,7 +61,7 @@ export function LotImages({ lotId }: { lotId: string }) {
   }
 
   async function uploadOne(file: File, position: number) {
-    const id = crypto.randomUUID();
+    const id = randomUuid();
     setUploads((prev) => [
       ...prev,
       { id, name: file.name, progress: 0, status: "validating" },
