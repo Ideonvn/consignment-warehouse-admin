@@ -33,7 +33,7 @@ export function Field({
       >
         {label}
         {required && (
-          <span className="text-danger" aria-hidden>
+          <span className="text-danger-ink" aria-hidden>
             *
           </span>
         )}
@@ -50,7 +50,7 @@ export function Field({
       {frozenReason ? (
         <p className="text-xs text-text-muted">{frozenReason}</p>
       ) : error ? (
-        <p role="alert" className="text-xs font-medium text-danger">
+        <p role="alert" className="text-xs font-medium text-danger-ink">
           {error}
         </p>
       ) : hint ? (

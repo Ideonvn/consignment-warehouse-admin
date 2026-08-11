@@ -57,7 +57,7 @@ export function Countdown({
       className={cn(
         "tnum whitespace-nowrap",
         closed && "text-text-muted",
-        urgent && "font-semibold text-danger",
+        urgent && "font-semibold text-danger-ink",
         className,
       )}
     >

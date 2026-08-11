@@ -152,7 +152,10 @@ export function LotDetail({ lotId }: { lotId: string }) {
       </Panel>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <div className="flex flex-col gap-4">
+        {/* min-w-0: a grid item defaults to min-width:auto, so the bid-history
+            table's intrinsic width would push this column past the viewport on
+            a phone and carry the photo controls off-screen with it. */}
+        <div className="flex min-w-0 flex-col gap-4">
           <LotEditForm lot={lot} currency={currency} />
           <BidHistory
             lotId={lot.id}
@@ -160,7 +163,7 @@ export function LotDetail({ lotId }: { lotId: string }) {
             currency={currency}
           />
         </div>
-        <div className="flex flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           <LotImages lotId={lot.id} />
           <Panel title="Timing">
             <dl className="flex flex-col gap-2 text-sm">

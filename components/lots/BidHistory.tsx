@@ -136,7 +136,7 @@ export function BidHistory({
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="text-danger"
+                        className="text-danger-ink"
                         onClick={() => setVoiding(bid)}
                       >
                         Void

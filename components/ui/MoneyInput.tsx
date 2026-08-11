@@ -120,7 +120,7 @@ export function MoneyInput({
         />
       </div>
       {error ? (
-        <p role="alert" className="text-xs font-medium text-danger">
+        <p role="alert" className="text-xs font-medium text-danger-ink">
           {error}
         </p>
       ) : showPreview ? (

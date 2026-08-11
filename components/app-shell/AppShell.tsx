@@ -41,8 +41,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           <MenuIcon />
         </button>
 
-        <Link href="/auctions" className="flex items-baseline gap-2">
-          <span className="text-sm font-semibold whitespace-nowrap">
+        {/* min-w-0 + truncate: the right-hand controls are fixed width, so the
+            brand is what has to give on a narrow phone. Without this the header
+            overflows and the whole page gets a horizontal scrollbar. */}
+        <Link href="/auctions" className="flex min-w-0 items-baseline gap-2">
+          <span className="truncate text-sm font-semibold">
             Consignment Warehouse
           </span>
           <span className="hidden text-[10px] font-semibold tracking-widest text-text-muted uppercase sm:inline">

@@ -132,7 +132,7 @@ export function AuctionActions({
                 className={
                   check.ok
                     ? "mt-0.5 text-success-ink"
-                    : "mt-0.5 text-danger"
+                    : "mt-0.5 text-danger-ink"
                 }
               >
                 {check.ok ? "✓" : "✕"}

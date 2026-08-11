@@ -26,6 +26,26 @@ import { ALLOWED_IMAGE_TYPES } from "@/types/api";
 import { cn, randomUuid } from "@/lib/utils";
 import type { LotImageAdmin } from "@/types/api";
 
+function TrashIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      className="h-4 w-4"
+    >
+      <path d="M2.5 4h11" />
+      <path d="M6.5 4V2.5h3V4" />
+      <path d="M4 4l.6 9a1 1 0 0 0 1 .9h4.8a1 1 0 0 0 1-.9L12 4" />
+      <path d="M6.5 6.5v5M9.5 6.5v5" />
+    </svg>
+  );
+}
+
 interface UploadItem {
   id: string;
   name: string;
@@ -268,7 +288,7 @@ export function LotImages({ lotId }: { lotId: string }) {
                   className={cn(
                     "tnum shrink-0",
                     item.status === "failed"
-                      ? "text-danger"
+                      ? "text-danger-ink"
                       : item.status === "done"
                         ? "text-success-ink"
                         : "text-text-muted",
@@ -295,7 +315,7 @@ export function LotImages({ lotId }: { lotId: string }) {
                 />
               </div>
               {item.error && (
-                <p role="alert" className="mt-0.5 text-danger">
+                <p role="alert" className="mt-0.5 text-danger-ink">
                   {item.error}
                 </p>
               )}
@@ -313,7 +333,7 @@ export function LotImages({ lotId }: { lotId: string }) {
         />
       ) : (
         <>
-          <ul className="grid grid-cols-3 gap-2">
+          <ul className="grid grid-cols-2 gap-2">
             {images.map((image) => {
               const isPrimary = image.id === effectivePrimaryId;
               return (
@@ -329,40 +349,64 @@ export function LotImages({ lotId }: { lotId: string }) {
                     handleDrop(image.id);
                   }}
                   className={cn(
-                    "group relative cursor-grab",
+                    "overflow-hidden rounded border bg-surface",
+                    isPrimary
+                      ? "border-accent ring-1 ring-accent"
+                      : "border-border",
                     dragImageId === image.id && "opacity-40",
                   )}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={image.url}
-                    alt=""
-                    loading="lazy"
-                    className={cn(
-                      "aspect-square w-full rounded border object-cover",
-                      isPrimary
-                        ? "border-accent ring-1 ring-accent"
-                        : "border-border",
+                  <div className="relative cursor-grab">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={image.url}
+                      alt=""
+                      loading="lazy"
+                      className="aspect-square w-full object-cover"
+                    />
+                    {isPrimary && (
+                      <span
+                        className="absolute top-1 left-1 rounded bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-accent-ink"
+                        title={
+                          flaggedPrimary
+                            ? "Flagged as the primary photo"
+                            : "No photo is flagged primary, so the lowest position is used — the same rule the bidder app applies"
+                        }
+                      >
+                        {flaggedPrimary ? "Primary" : "Primary*"}
+                      </span>
                     )}
-                  />
-                  {isPrimary && (
-                    <span
-                      className="absolute top-1 left-1 rounded bg-accent px-1 text-[10px] font-semibold text-accent-ink"
-                      title={
-                        flaggedPrimary
-                          ? "Flagged as the primary photo"
-                          : "No photo is flagged primary, so the lowest position is used — the same rule the bidder app applies"
-                      }
-                    >
-                      {flaggedPrimary ? "primary" : "primary*"}
-                    </span>
-                  )}
-                  <div className="absolute inset-x-1 bottom-1 flex justify-between gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
-                    {!isPrimary && (
+                  </div>
+
+                  {/*
+                   * The controls sit BELOW the photo, on a known surface, and are
+                   * always visible.
+                   *
+                   * They used to be overlaid on the image and revealed on hover,
+                   * which drew nothing at all on a touch device — and this app is
+                   * meant to be usable on a phone in a warehouse. Overlaying them
+                   * also put small text on top of an arbitrary uploaded
+                   * photograph, where contrast cannot be guaranteed; on --surface
+                   * it is a measured token pairing.
+                   *
+                   * draggable={false} so a press on a control does not start
+                   * dragging the thumbnail instead of activating the button.
+                   */}
+                  <div
+                    draggable={false}
+                    onDragStart={(event) => event.stopPropagation()}
+                    className="flex items-stretch border-t border-border"
+                  >
+                    {isPrimary ? (
+                      <span className="flex min-h-11 flex-1 items-center justify-center px-2 text-xs font-medium text-accent-strong">
+                        Primary
+                      </span>
+                    ) : (
                       <button
                         type="button"
                         onClick={() => makePrimary.mutate(image)}
-                        className="rounded bg-surface/90 px-1 text-[10px] font-medium hover:bg-surface"
+                        title="Show this photo to bidders first"
+                        className="flex min-h-11 flex-1 items-center justify-center px-2 text-xs font-medium text-text hover:bg-surface-sunken"
                       >
                         Make primary
                       </button>
@@ -370,9 +414,11 @@ export function LotImages({ lotId }: { lotId: string }) {
                     <button
                       type="button"
                       onClick={() => setDeleting(image)}
-                      className="ml-auto rounded bg-surface/90 px-1 text-[10px] font-medium text-danger hover:bg-surface"
+                      aria-label="Delete this photo"
+                      title="Delete this photo"
+                      className="flex min-h-11 w-11 shrink-0 items-center justify-center border-l border-border text-danger-ink hover:bg-danger-tint"
                     >
-                      Delete
+                      <TrashIcon />
                     </button>
                   </div>
                 </li>

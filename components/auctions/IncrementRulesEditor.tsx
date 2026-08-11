@@ -134,7 +134,7 @@ export function IncrementRulesEditor({
                         variant="ghost"
                         disabled={disabled || busy}
                         onClick={() => void handleDelete(band)}
-                        className="text-danger"
+                        className="text-danger-ink"
                       >
                         Delete
                       </Button>
@@ -225,7 +225,7 @@ export function IncrementRulesEditor({
             Add band
           </Button>
           {error && (
-            <p role="alert" className="text-xs font-medium text-danger">
+            <p role="alert" className="text-xs font-medium text-danger-ink">
               {error}
             </p>
           )}
