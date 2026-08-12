@@ -9,6 +9,8 @@ import { DateTimeInput } from "@/components/ui/DateTimeInput";
 import { Field } from "@/components/ui/Field";
 import { Note } from "@/components/ui/Feedback";
 import { Input, Textarea } from "@/components/ui/Input";
+import { MoneyInput } from "@/components/ui/MoneyInput";
+import { PremiumField } from "./PremiumField";
 import { Panel } from "@/components/ui/Panel";
 import { updateAuction } from "@/lib/api/endpoints";
 import { errorMessage, isApiError } from "@/lib/api/errors";
@@ -29,6 +31,8 @@ function freezeReasons(auction: AuctionAdmin, anyLotHasBid: boolean) {
     anti_snipe_window_seconds: bidFreeze,
     anti_snipe_extension_seconds: bidFreeze,
     max_extensions: bidFreeze,
+    deposit_amount_minor: bidFreeze,
+    buyers_premium_bps: bidFreeze,
     starts_at:
       auction.status === "live"
         ? "Locked: the auction is already live, so it cannot be given a different opening time."
@@ -45,6 +49,8 @@ interface Draft {
   anti_snipe_window_seconds: number;
   anti_snipe_extension_seconds: number;
   max_extensions: number;
+  deposit_amount_minor: number;
+  buyers_premium_bps: number;
 }
 
 function toDraft(auction: AuctionAdmin): Draft {
@@ -57,6 +63,8 @@ function toDraft(auction: AuctionAdmin): Draft {
     anti_snipe_window_seconds: auction.anti_snipe_window_seconds,
     anti_snipe_extension_seconds: auction.anti_snipe_extension_seconds,
     max_extensions: auction.max_extensions,
+    deposit_amount_minor: auction.deposit_amount_minor,
+    buyers_premium_bps: auction.buyers_premium_bps,
   };
 }
 
@@ -123,6 +131,12 @@ export function AuctionEditForm({
       }
       if (draft.max_extensions !== auction.max_extensions) {
         patch.max_extensions = draft.max_extensions;
+      }
+      if (draft.deposit_amount_minor !== auction.deposit_amount_minor) {
+        patch.deposit_amount_minor = draft.deposit_amount_minor;
+      }
+      if (draft.buyers_premium_bps !== auction.buyers_premium_bps) {
+        patch.buyers_premium_bps = draft.buyers_premium_bps;
       }
     }
     if (confirmShorten) patch.confirm_shorten = true;
@@ -336,6 +350,31 @@ export function AuctionEditForm({
                 }
               />
             </Field>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field
+              label="Bidder deposit"
+              frozenReason={frozen.deposit_amount_minor}
+              error={fieldError("deposit_amount_minor")}
+              hint="What someone must hold in credit before they can bid here. Zero means no deposit."
+            >
+              <MoneyInput
+                value={draft.deposit_amount_minor}
+                currency={draft.currency_code || auction.currency_code}
+                disabled={Boolean(frozen.deposit_amount_minor)}
+                onChange={(minor) =>
+                  setDraft({ ...draft, deposit_amount_minor: minor ?? 0 })
+                }
+              />
+            </Field>
+
+            <PremiumField
+              bps={draft.buyers_premium_bps}
+              frozenReason={frozen.buyers_premium_bps}
+              error={fieldError("buyers_premium_bps")}
+              onChange={(bps) => setDraft({ ...draft, buyers_premium_bps: bps })}
+            />
           </div>
 
           <div className="flex items-center gap-2 border-t border-border pt-3">

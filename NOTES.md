@@ -47,6 +47,40 @@ sending one subscribe per group, capped at 30 messages. It now sends the per-lot
 map the backend added, which is both correct and fewer messages; the chunk size
 dropped to 40 lot ids per message because the map repeats each id.
 
+**The ledger UI has no edit or delete, by construction.** The backend ledger is
+append-only, so a statement row offers exactly one corrective action: reverse.
+That posts a matching opposite entry pointing at the original and leaves both on
+the record, which is what makes the statement reconcilable against a bank
+statement. If a future screen wants an "edit entry" affordance, the answer is a
+reversal.
+
+**No +/- control anywhere in the record form.** `amount_minor` goes to the API as
+a positive magnitude and the backend derives the sign from `entry_type`, so the
+form collects a positive amount and shows the direction as a consequence of the
+type chosen ("Adds credit" / "Takes credit off", rendered as a disabled field).
+`adjustment` is the one type with no inherent direction, so it - and only it -
+turns that into a required choice; sending `direction` on any other type is
+refused by the backend, so it is omitted rather than defaulted.
+
+**Balances are stated as sentences, not signed integers.** "R2 000,00 owing" and
+"R10 000,00 in credit" rather than `-200000`. An operator scanning a list under
+time pressure is one misread minus sign away from chasing the wrong person.
+`amount_minor` comes back SIGNED from the API (confirmed against the running
+backend: a deposit returns +100000, a refund -20000), so the statement splits it
+into Charge and Credit columns rather than printing a signed number.
+
+**Participants are a query, not a roster.** The list is computed on read, so
+there is no registration, no approval step, and deliberately no "approve"
+button - eligibility follows from the balance. The screen defaults to the
+ineligible filter because that is the working list: the people to chase. Every
+row links to that person's ledger, so recording the deposit that makes them
+eligible is one hop.
+
+**The buyer's premium is entered as a percentage and stored as basis points.**
+The operator types 12.5 and the field says "Stored as 1250 basis points"
+underneath. Echoing the stored value is the point: a rate that quietly means a
+hundredth of what someone intended surfaces on an invoice, not in the form.
+
 **The cover image lives outside the edit form.** `image_url` is deliberately not
 a frozen field — an auction keeps its name, description and image editable once
 bidding starts — but the edit form is where the freezing rules live, so keeping
@@ -119,10 +153,18 @@ they existed for are gone:
 
 ### Still open
 
-1. **The OTP endpoint is rate-limited per source address**, which makes scripted
-   verification against a local backend slow — several verification runs in this
-   round were spent waiting for the per-address window to clear. A local-only
-   bypass would help.
+1. **`GET /admin/users/{id}/ledger` and `GET .../participants` do not send
+   `X-Has-More`.** The brief says the statement carries it and CORS already
+   exposes the header, but neither endpoint sets it (`GET /lots/{id}/bids`
+   does). Both clients read it when present and otherwise fall back to "a full
+   page means there may be more", which over-reports a next page when the count
+   is an exact multiple of the page size.
+
+2. **The OTP endpoint is rate-limited per source address and per phone.** With
+   only two admin accounts in the seed it is possible to lock yourself out of
+   the console for an hour, which has cost real time in several verification
+   runs. A local-only bypass, or a higher limit while `APP_ENV=local`, would
+   help.
 
 ### Corrected — the CORS-on-errors report was wrong
 

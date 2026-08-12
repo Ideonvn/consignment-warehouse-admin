@@ -94,3 +94,40 @@ export function formatShortfall(
   const shortfall = reserveMinor - (topBidMinor ?? 0);
   return formatMoney(Math.max(shortfall, 0), currency);
 }
+
+/* --------------------------------------------------------------- rates */
+
+/**
+ * The buyer's premium is stored in BASIS POINTS — 1500 is 15%. Operators think
+ * in percent, so the UI collects a percentage and converts here, and always
+ * shows the stored value back so there is no ambiguity about what was saved.
+ */
+export function bpsToPercentString(bps: number): string {
+  const percent = bps / 100;
+  return Number.isInteger(percent) ? String(percent) : percent.toFixed(2);
+}
+
+export type BpsParseResult =
+  | { ok: true; bps: number }
+  | { ok: false; error: string };
+
+/** "15" -> 1500, "12.5" -> 1250. Two decimal places is the resolution. */
+export function parsePercentToBps(raw: string): BpsParseResult {
+  const cleaned = raw.replace(/[\s%]/g, "").replace(",", ".");
+  if (cleaned === "") return { ok: true, bps: 0 };
+  if (!/^\d*(\.\d{0,2})?$/.test(cleaned)) {
+    return { ok: false, error: "Enter a percentage like 15 or 12.5" };
+  }
+  const percent = Number.parseFloat(cleaned);
+  if (!Number.isFinite(percent)) {
+    return { ok: false, error: "Enter a percentage like 15 or 12.5" };
+  }
+  if (percent > 100) return { ok: false, error: "That is over 100%" };
+  // Round rather than truncate: 12.345 typed by hand should not silently drop.
+  return { ok: true, bps: Math.round(percent * 100) };
+}
+
+/** "15%" for display next to a stored bps value. */
+export function formatBps(bps: number): string {
+  return `${bpsToPercentString(bps)}%`;
+}

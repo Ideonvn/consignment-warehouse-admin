@@ -112,6 +112,10 @@ export const auctionAdminSchema = z.object({
    * an uploaded image from an external URL.
    */
   image_storage_key: z.string().nullable(),
+  /** What a bidder must hold in credit before this auction lets them bid. */
+  deposit_amount_minor: z.number(),
+  /** Basis points: 1500 is 15%. Never shown raw to the operator. */
+  buyers_premium_bps: z.number(),
 });
 export type AuctionAdmin = z.infer<typeof auctionAdminSchema>;
 
@@ -149,6 +153,8 @@ export const createAuctionSchema = z.object({
   anti_snipe_window_seconds: z.number().int().min(0).optional(),
   anti_snipe_extension_seconds: z.number().int().min(0).optional(),
   max_extensions: z.number().int().min(0).optional(),
+  deposit_amount_minor: z.number().int().min(0).optional(),
+  buyers_premium_bps: z.number().int().min(0).max(10000).optional(),
 });
 export type CreateAuctionInput = z.infer<typeof createAuctionSchema>;
 
@@ -162,6 +168,8 @@ export const updateAuctionSchema = z.object({
   anti_snipe_window_seconds: z.number().int().optional(),
   anti_snipe_extension_seconds: z.number().int().optional(),
   max_extensions: z.number().int().optional(),
+  deposit_amount_minor: z.number().int().min(0).optional(),
+  buyers_premium_bps: z.number().int().min(0).max(10000).optional(),
   confirm_shorten: z.boolean().optional(),
 });
 export type UpdateAuctionInput = z.infer<typeof updateAuctionSchema>;
@@ -409,6 +417,93 @@ export const changeRoleSchema = z.object({
   reason: z.string().min(1).max(500),
 });
 export type ChangeRoleInput = z.infer<typeof changeRoleSchema>;
+
+/* ----------------------------------------------------------------- ledger */
+
+/**
+ * One running ledger per user. Signed entries in minor units; the balance is
+ * their sum. Positive is in credit, negative is owing. There are no buckets and
+ * no transfers — one number per person.
+ */
+export const ledgerEntryTypeSchema = z.enum([
+  "deposit",
+  "payment",
+  "lot_won",
+  "buyers_premium",
+  "refund",
+  "adjustment",
+  "reversal",
+]);
+export type LedgerEntryType = z.infer<typeof ledgerEntryTypeSchema>;
+
+/** Only `adjustment` has no inherent direction, so only it carries this. */
+export const ledgerDirectionSchema = z.enum(["credit", "debit"]);
+export type LedgerDirection = z.infer<typeof ledgerDirectionSchema>;
+
+export const ledgerEntryAdminSchema = z.object({
+  id: z.string(),
+  user_id: z.string(),
+  entry_type: ledgerEntryTypeSchema,
+  /**
+   * SIGNED on the way out — the backend has already applied the direction the
+   * entry type implies. On the way in it is a positive magnitude; see
+   * `createLedgerEntrySchema`.
+   */
+  amount_minor: z.number(),
+  currency_code: z.string(),
+  description: z.string().nullable(),
+  reference: z.string().nullable(),
+  lot_id: z.string().nullable(),
+  auction_id: z.string().nullable(),
+  created_by_user_id: z.string().nullable(),
+  /** Set on a correction, pointing at the entry it cancels. */
+  reverses_entry_id: z.string().nullable(),
+  rate_bps: z.number().nullable(),
+  created_at: z.string(),
+  /** Accumulated oldest-first and continued across pages; null on a POST. */
+  balance_after_minor: z.number().nullish(),
+});
+export type LedgerEntryAdmin = z.infer<typeof ledgerEntryAdminSchema>;
+
+export const ledgerStatementSchema = z.object({
+  user_id: z.string(),
+  balance_minor: z.number(),
+  currency_code: z.string(),
+  entries: z.array(ledgerEntryAdminSchema),
+});
+export type LedgerStatement = z.infer<typeof ledgerStatementSchema>;
+
+/**
+ * `amount_minor` is a positive MAGNITUDE. The sign comes from `entry_type`, so
+ * a negative amount is not representable and the UI must never offer one.
+ */
+export const createLedgerEntrySchema = z.object({
+  entry_type: ledgerEntryTypeSchema,
+  amount_minor: z.number().int().positive(),
+  direction: ledgerDirectionSchema.optional(),
+  description: z.string().max(2000).nullable().optional(),
+  reference: z.string().max(200).nullable().optional(),
+});
+export type CreateLedgerEntryInput = z.infer<typeof createLedgerEntrySchema>;
+
+/* ----------------------------------------------------------- participants */
+
+/** Computed on read — there is no participant table and no approval step. */
+export const participantSchema = z.object({
+  user_id: z.string(),
+  handle: z.string(),
+  phone_e164: z.string(),
+  first_name: z.string().nullable(),
+  last_name: z.string().nullable(),
+  balance_minor: z.number(),
+  required_deposit_minor: z.number(),
+  /** Floored at zero by the backend. */
+  shortfall_minor: z.number(),
+  is_eligible: z.boolean(),
+  has_bid: z.boolean(),
+  bid_count: z.number(),
+});
+export type Participant = z.infer<typeof participantSchema>;
 
 /* --------------------------------------------------------------- realtime */
 

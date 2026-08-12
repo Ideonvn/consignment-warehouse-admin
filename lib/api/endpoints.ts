@@ -13,7 +13,10 @@ import {
   incrementRuleSchema,
   lotAdminDetailSchema,
   lotAdminSummarySchema,
+  ledgerEntryAdminSchema,
+  ledgerStatementSchema,
   lotImageAdminSchema,
+  participantSchema,
   presignResultSchema,
   voidBidResultSchema,
   wsTicketSchema,
@@ -28,12 +31,16 @@ import {
   type CreateAuctionInput,
   type CreateIncrementRuleInput,
   type CreateLotInput,
+  type CreateLedgerEntryInput,
   type CursorPage,
   type IncrementRule,
+  type LedgerEntryAdmin,
+  type LedgerStatement,
   type LotAdminDetail,
   type LotAdminSummary,
   type LotImageAdmin,
   type LotStatus,
+  type Participant,
   type PresignRequestInput,
   type PresignResult,
   type RelistLotInput,
@@ -53,6 +60,7 @@ const ruleListSchema = z.array(incrementRuleSchema);
 const imageListSchema = z.array(lotImageAdminSchema);
 const userListSchema = z.array(adminUserSchema);
 const bidListSchema = z.array(bidSchema);
+const participantListSchema = z.array(participantSchema);
 
 /* --------------------------------------------------------------- auctions */
 
@@ -443,6 +451,100 @@ export function changeUserRole(
     body,
     schema: adminUserSchema,
   });
+}
+
+/* ----------------------------------------------------------------- ledger */
+
+export interface LedgerPageParams {
+  limit?: number;
+  offset?: number;
+}
+
+export interface LedgerPage {
+  statement: LedgerStatement;
+  hasMore: boolean;
+}
+
+/**
+ * The endpoint does not currently send `X-Has-More` (the bids endpoint does),
+ * so a full page is taken to mean "there may be more". Recorded in NOTES.md.
+ */
+export async function getUserLedger(
+  userId: string,
+  params: LedgerPageParams = {},
+  signal?: AbortSignal,
+): Promise<LedgerPage> {
+  const limit = params.limit ?? 25;
+  const result = await apiRequestPaged(`/admin/users/${userId}/ledger`, {
+    schema: ledgerStatementSchema,
+    query: { limit, offset: params.offset ?? 0 },
+    signal,
+  });
+  return {
+    statement: result.data,
+    hasMore: result.hasMore || result.data.entries.length === limit,
+  };
+}
+
+export function createLedgerEntry(
+  userId: string,
+  body: CreateLedgerEntryInput,
+): Promise<LedgerEntryAdmin> {
+  return apiRequest(`/admin/users/${userId}/ledger`, {
+    method: "POST",
+    body,
+    schema: ledgerEntryAdminSchema,
+  });
+}
+
+/** An entry can be reversed at most once; a second attempt is a 409. */
+export function reverseLedgerEntry(
+  entryId: string,
+  reason: string,
+): Promise<LedgerEntryAdmin> {
+  return apiRequest(`/admin/ledger/${entryId}/reverse`, {
+    method: "POST",
+    body: { reason },
+    schema: ledgerEntryAdminSchema,
+  });
+}
+
+/* ----------------------------------------------------------- participants */
+
+export interface ListParticipantsParams {
+  /** Undefined means everyone; false is the working list of who to chase. */
+  eligible?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+export interface ParticipantsPage {
+  items: Participant[];
+  hasMore: boolean;
+}
+
+export async function listParticipants(
+  auctionId: string,
+  params: ListParticipantsParams = {},
+  signal?: AbortSignal,
+): Promise<ParticipantsPage> {
+  const limit = params.limit ?? 100;
+  const result = await apiRequestPaged(
+    `/admin/auctions/${auctionId}/participants`,
+    {
+      schema: participantListSchema,
+      query: {
+        eligible: params.eligible,
+        limit,
+        offset: params.offset ?? 0,
+      },
+      signal,
+    },
+  );
+  return {
+    items: result.data,
+    hasMore: result.hasMore || result.data.length === limit,
+  };
 }
 
 /* --------------------------------------------------------------- realtime */

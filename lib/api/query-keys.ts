@@ -17,6 +17,13 @@ export const queryKeys = {
   users: (params: ListUsersParams = {}) => ["users", params] as const,
   user: (userId: string) => ["user", userId] as const,
 
+  ledgerRoot: (userId: string) => ["user", userId, "ledger"] as const,
+  ledger: (userId: string, page: number) =>
+    ["user", userId, "ledger", page] as const,
+
+  participants: (auctionId: string, eligible: boolean | undefined) =>
+    ["auction", auctionId, "participants", eligible ?? "all"] as const,
+
   /** Every reserve-not-met lot across every auction, one page at a time. */
   decisionsRoot: ["decisions"] as const,
   decisions: (page: number) => ["decisions", "page", page] as const,

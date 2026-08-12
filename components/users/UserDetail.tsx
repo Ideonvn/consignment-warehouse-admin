@@ -25,6 +25,7 @@ import { USER_ROLE_META } from "@/lib/format/status";
 import { isSuperadmin, useSessionStore } from "@/lib/auth";
 import { usePageTitle } from "@/lib/ui/use-page-title";
 import { userRoleSchema, type UserRole } from "@/types/api";
+import { UserLedger } from "./UserLedger";
 
 export function UserDetail({ userId }: { userId: string }) {
   const client = useQueryClient();
@@ -188,7 +189,9 @@ export function UserDetail({ userId }: { userId: string }) {
         </DataPoint>
       </Panel>
 
-      <Panel title="Account">
+      <UserLedger userId={userId} />
+
+      <Panel title="Account" className="mt-4">
         <dl className="grid gap-3 sm:grid-cols-2">
           <div>
             <dt className="text-xs text-text-muted">Phone</dt>

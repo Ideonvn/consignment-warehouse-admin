@@ -14,7 +14,9 @@ import { Field } from "@/components/ui/Field";
 import { Note } from "@/components/ui/Feedback";
 import { Input, Textarea } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 import { Panel } from "@/components/ui/Panel";
+import { PremiumField } from "@/components/auctions/PremiumField";
 import {
   confirmAuctionImage,
   createAuction,
@@ -53,6 +55,8 @@ const formSchema = z
     anti_snipe_window_seconds: z.number().int().min(0).max(3600),
     anti_snipe_extension_seconds: z.number().int().min(0).max(3600),
     max_extensions: z.number().int().min(0).max(1000),
+    deposit_amount_minor: z.number().int().min(0),
+    buyers_premium_bps: z.number().int().min(0).max(10000),
   })
   .refine((data) => Date.parse(data.ends_at) > Date.parse(data.starts_at), {
     message: "The closing time must be after the opening time",
@@ -100,6 +104,8 @@ export default function NewAuctionPage() {
       anti_snipe_window_seconds: 300,
       anti_snipe_extension_seconds: 300,
       max_extensions: 20,
+      deposit_amount_minor: 0,
+      buyers_premium_bps: 0,
     },
   });
 
@@ -119,6 +125,8 @@ export default function NewAuctionPage() {
         anti_snipe_window_seconds: parsed.anti_snipe_window_seconds,
         anti_snipe_extension_seconds: parsed.anti_snipe_extension_seconds,
         max_extensions: parsed.max_extensions,
+        deposit_amount_minor: parsed.deposit_amount_minor,
+        buyers_premium_bps: parsed.buyers_premium_bps,
       });
 
       // Rules can only be attached once the auction exists.
@@ -436,6 +444,30 @@ export default function NewAuctionPage() {
                 {...register("max_extensions", { valueAsNumber: true })}
               />
             </Field>
+          </div>
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <Field
+              label="Bidder deposit"
+              hint="What someone must hold in credit before they can bid here. Zero means no deposit."
+            >
+              <MoneyInput
+                value={values.deposit_amount_minor ?? 0}
+                currency={values.currency_code || "ZAR"}
+                onChange={(minor) =>
+                  setValue("deposit_amount_minor", minor ?? 0, {
+                    shouldValidate: true,
+                  })
+                }
+              />
+            </Field>
+
+            <PremiumField
+              bps={values.buyers_premium_bps ?? 0}
+              onChange={(bps) =>
+                setValue("buyers_premium_bps", bps, { shouldValidate: true })
+              }
+            />
           </div>
 
           <Note tone="info" className="mt-3">

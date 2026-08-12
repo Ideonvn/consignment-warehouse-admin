@@ -28,12 +28,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AuctionActions } from "./AuctionActions";
 import { AuctionEditForm } from "./AuctionEditForm";
 import { AuctionImage } from "./AuctionImage";
+import { AuctionParticipants } from "./AuctionParticipants";
 import { IncrementRulesEditor } from "./IncrementRulesEditor";
 import { LotsTab } from "@/components/lots/LotsTab";
 
 const TABS = [
   { id: "overview", label: "Overview" },
   { id: "lots", label: "Lots" },
+  { id: "participants", label: "Participants" },
   { id: "increments", label: "Increments" },
 ];
 
@@ -181,6 +183,8 @@ export function AuctionDetail({ auctionId }: { auctionId: string }) {
       )}
 
       {tab === "lots" && <LotsTab auction={auction} />}
+
+      {tab === "participants" && <AuctionParticipants auction={auction} />}
 
       {tab === "increments" && (
         <Panel

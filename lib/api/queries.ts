@@ -112,6 +112,39 @@ export function useUser(userId: string | undefined) {
   });
 }
 
+/* ----------------------------------------------------------------- ledger */
+
+export const LEDGER_PAGE_SIZE = 25;
+
+export function useUserLedger(userId: string | undefined, page = 0) {
+  const enabled = useAuthed();
+  return useQuery({
+    queryKey: queryKeys.ledger(userId ?? "", page),
+    queryFn: ({ signal }) =>
+      api.getUserLedger(
+        userId!,
+        { limit: LEDGER_PAGE_SIZE, offset: page * LEDGER_PAGE_SIZE },
+        signal,
+      ),
+    enabled: enabled && Boolean(userId),
+    placeholderData: (previous) => previous,
+  });
+}
+
+export function useParticipants(
+  auctionId: string | undefined,
+  eligible: boolean | undefined,
+) {
+  const enabled = useAuthed();
+  return useQuery({
+    queryKey: queryKeys.participants(auctionId ?? "", eligible),
+    queryFn: ({ signal }) =>
+      api.listParticipants(auctionId!, { eligible, limit: 200 }, signal),
+    enabled: enabled && Boolean(auctionId),
+    placeholderData: (previous) => previous,
+  });
+}
+
 /* -------------------------------------------------------------- decisions */
 
 export const DECISIONS_PAGE_SIZE = 50;

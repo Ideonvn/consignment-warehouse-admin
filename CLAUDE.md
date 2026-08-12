@@ -151,6 +151,48 @@ in `onNeedsRefetch` for that reason. Do not remove it. Related: the fallback is
 also *visible* — a gap filled silently while the socket looks healthy is a lie
 about staleness.
 
+**The credit ledger is append-only, and the sign is not the operator's to
+choose.** Two rules, both structural:
+
+*Append-only.* Nothing is ever edited or deleted. A mistake is corrected by
+posting a **reversal** that points at the original, leaving both on the record —
+that is what lets a statement be reconciled against a bank statement. There is
+no edit affordance to build, and if a screen seems to want one, the answer is a
+reversal. An entry can be reversed once; a second attempt is a 409 and should say
+so plainly rather than surfacing a generic error.
+
+*Sign comes from the entry type.* `amount_minor` is posted as a positive
+magnitude and the backend applies the direction: `deposit` and `payment` add
+credit, `refund` and the charge types subtract. A negative amount is not
+representable, so **never build a +/− toggle** — collect a positive amount and
+show the direction as a consequence of the type. `adjustment` is the sole
+exception: it has no inherent direction and must send
+`direction: "credit" | "debit"`. Omitting it there is a 422, and sending it on
+any other type is also refused, so it is a required choice on that type and
+absent everywhere else.
+
+On the way *out* `amount_minor` is signed, which is how an adjustment's
+direction is recoverable (the read shape carries no `direction`). The statement
+splits it into Charge and Credit columns; balances are stated as sentences —
+"R2 000,00 owing", "R10 000,00 in credit" — because a misread minus sign means
+chasing the wrong person. `lib/format/ledger.ts` owns that wording and the
+entry-type labels (`lot_won` is "Lot won", `buyers_premium` is "Buyer's
+premium", `reversal` is "Correction").
+
+**Participants are a query, not a roster.** `GET /admin/auctions/{id}/participants`
+is computed on read — there is no participant table, no registration and no
+approval step, so **do not build an "approve" control**. Eligibility falls out of
+the balance against the auction's deposit, which means recording a deposit is
+what makes someone eligible; the screen defaults to the ineligible filter
+because that is the working list, and every row links to that person's ledger.
+
+**The buyer's premium is basis points.** `buyers_premium_bps` of 1500 is 15%.
+Operators enter a percentage and `parsePercentToBps` converts; the field always
+echoes the stored bps back, because a rate that silently means a hundredth of
+what was intended shows up on an invoice rather than in the form. Both
+`deposit_amount_minor` and `buyers_premium_bps` **freeze once any lot has a
+bid**, through the same `freezeReasons` map as the other bidding rules.
+
 **The auction cover image is not frozen.** Auctions keep name, description and
 image editable after bidding starts, so the image control sits *outside*
 `AuctionEditForm` — that component is where the freeze rules live, and anything
