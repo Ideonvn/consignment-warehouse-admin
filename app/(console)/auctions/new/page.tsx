@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -15,14 +15,20 @@ import { Note } from "@/components/ui/Feedback";
 import { Input, Textarea } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
-import { createAuction, createIncrementRule } from "@/lib/api/endpoints";
+import {
+  confirmAuctionImage,
+  createAuction,
+  createIncrementRule,
+  presignAuctionImage,
+} from "@/lib/api/endpoints";
+import { postToStorage, StorageUploadError, validateImageFile } from "@/lib/api/upload";
 import { errorMessage, isApiError } from "@/lib/api/errors";
 import { useAuctionInvalidation } from "@/lib/api/queries";
 import { formatCountdown } from "@/lib/format/datetime";
 import { slugify } from "@/lib/format/slug";
 import { useNow } from "@/lib/ui/hooks";
 import type { IncrementBand } from "@/lib/format/increments";
-import { AUCTION_SLUG_RE } from "@/types/api";
+import { ALLOWED_IMAGE_TYPES, AUCTION_SLUG_RE } from "@/types/api";
 
 const formSchema = z
   .object({
@@ -67,6 +73,12 @@ export default function NewAuctionPage() {
   const router = useRouter();
   const invalidate = useAuctionInvalidation();
   const [bands, setBands] = useState<IncrementBand[]>([]);
+  // Presign is scoped to an auction that exists, so a file cannot be uploaded
+  // until after creation. Same shape as the increment rules below: collect the
+  // choice here, apply it once there is an auction to attach it to.
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const [slugTouched, setSlugTouched] = useState(false);
 
   const {
@@ -121,13 +133,36 @@ export default function NewAuctionPage() {
           failed.push(errorMessage(error));
         }
       }
-      return { auction, failed };
+      // The auction exists from here on. An image failure is reported, never
+      // fatal — losing a created auction over a cover photo would be absurd.
+      let imageFailure: string | null = null;
+      if (imageFile) {
+        try {
+          const presign = await presignAuctionImage(auction.id, {
+            content_type: imageFile.type,
+            size_bytes: imageFile.size,
+          });
+          await postToStorage(presign, imageFile);
+          await confirmAuctionImage(auction.id, presign.storage_key);
+        } catch (error) {
+          imageFailure =
+            error instanceof StorageUploadError
+              ? error.message
+              : `The API rejected the image: ${errorMessage(error)}`;
+        }
+      }
+
+      return { auction, failed, imageFailure };
     },
-    onSuccess: ({ auction, failed }) => {
+    onSuccess: ({ auction, failed, imageFailure }) => {
       invalidate(auction.id);
       if (failed.length > 0) {
         toast.warning(
           `Auction created, but ${failed.length} increment rule(s) were rejected: ${failed[0]}`,
+        );
+      } else if (imageFailure) {
+        toast.warning(
+          `"${auction.name}" was created, but the cover image did not attach: ${imageFailure} You can add it from this screen.`,
         );
       } else {
         toast.success(`"${auction.name}" created as a draft`);
@@ -224,11 +259,65 @@ export default function NewAuctionPage() {
             </Field>
 
             <Field
-              label="Cover image URL"
-              htmlFor="image_url"
-              hint="Optional. Lot photos are uploaded per lot, not here."
+              label="Cover image"
+              hint="Optional, and either way is fine — paste an address, or pick a file to upload once the auction exists. Lot photos are added per lot, not here."
+              error={imageError}
             >
-              <Input id="image_url" {...register("image_url")} />
+              <div className="flex flex-col gap-2">
+                <Input
+                  id="image_url"
+                  type="url"
+                  inputMode="url"
+                  placeholder="https://example.com/photo.jpg"
+                  disabled={Boolean(imageFile)}
+                  {...register("image_url")}
+                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept={ALLOWED_IMAGE_TYPES.join(",")}
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null;
+                      event.target.value = "";
+                      if (!file) return;
+                      const invalid = validateImageFile(file);
+                      if (invalid) {
+                        setImageError(invalid);
+                        return;
+                      }
+                      setImageError(null);
+                      setImageFile(file);
+                      // One image, one source: a chosen file wins over the URL.
+                      setValue("image_url", "");
+                    }}
+                  />
+                  <Button
+                    variant="secondary"
+                    onClick={() => imageInputRef.current?.click()}
+                  >
+                    {imageFile ? "Choose a different file" : "Upload a file"}
+                  </Button>
+                  {imageFile && (
+                    <>
+                      <span className="truncate text-xs text-text-muted">
+                        {imageFile.name} · uploads after the auction is created
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setImageFile(null);
+                          setImageError(null);
+                        }}
+                      >
+                        Clear
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
             </Field>
           </div>
         </Panel>

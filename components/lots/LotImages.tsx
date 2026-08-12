@@ -16,14 +16,10 @@ import {
 import { errorMessage } from "@/lib/api/errors";
 import { useLotImages } from "@/lib/api/queries";
 import { queryKeys } from "@/lib/api/query-keys";
-import {
-  postToStorage,
-  readImageDimensions,
-  StorageUploadError,
-  validateImageFile,
-} from "@/lib/api/upload";
+import { useDirectUpload } from "@/lib/api/use-direct-upload";
+import { UploadProgress } from "@/components/ui/UploadProgress";
 import { ALLOWED_IMAGE_TYPES } from "@/types/api";
-import { cn, randomUuid } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import type { LotImageAdmin } from "@/types/api";
 
 function TrashIcon() {
@@ -46,20 +42,11 @@ function TrashIcon() {
   );
 }
 
-interface UploadItem {
-  id: string;
-  name: string;
-  progress: number;
-  status: "validating" | "uploading" | "confirming" | "done" | "failed";
-  error?: string;
-}
-
 export function LotImages({ lotId }: { lotId: string }) {
   const client = useQueryClient();
   const { data, isPending } = useLotImages(lotId);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [dragImageId, setDragImageId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<LotImageAdmin | null>(null);
@@ -74,76 +61,27 @@ export function LotImages({ lotId }: { lotId: string }) {
     void client.invalidateQueries({ queryKey: queryKeys.lotImages(lotId) });
   }
 
-  function patchUpload(id: string, patch: Partial<UploadItem>) {
-    setUploads((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...patch } : item)),
-    );
-  }
-
-  async function uploadOne(file: File, position: number) {
-    const id = randomUuid();
-    setUploads((prev) => [
-      ...prev,
-      { id, name: file.name, progress: 0, status: "validating" },
-    ]);
-
-    const invalid = validateImageFile(file);
-    if (invalid) {
-      patchUpload(id, { status: "failed", error: invalid });
-      return;
-    }
-
-    try {
-      const dimensions = await readImageDimensions(file);
-      const presign = await presignLotImage(lotId, {
+  const { uploads, upload } = useDirectUpload({
+    presign: (file) =>
+      presignLotImage(lotId, {
         content_type: file.type,
         size_bytes: file.size,
-      });
-
-      patchUpload(id, { status: "uploading" });
-      await postToStorage(presign, file, (fraction) =>
-        patchUpload(id, { progress: fraction }),
-      );
-
-      patchUpload(id, { status: "confirming", progress: 1 });
-      await confirmLotImage(lotId, {
+      }),
+    confirm: ({ presign, dimensions, index }) =>
+      confirmLotImage(lotId, {
         storage_key: presign.storage_key,
         width: dimensions?.width ?? null,
         height: dimensions?.height ?? null,
         is_primary: false,
-        position,
-      });
+        position: index,
+      }),
+    onUploaded: refresh,
+  });
 
-      patchUpload(id, { status: "done" });
-      setTimeout(
-        () => setUploads((prev) => prev.filter((item) => item.id !== id)),
-        1500,
-      );
-      refresh();
-    } catch (error) {
-      // A storage rejection and an API validation failure need different words:
-      // one means the bytes never landed, the other means they did but the API
-      // would not record them.
-      const message =
-        error instanceof StorageUploadError
-          ? error.message
-          : `The API rejected the upload: ${errorMessage(error)}`;
-      patchUpload(id, { status: "failed", error: message });
-    }
+  function handleFiles(files: FileList | File[]) {
+    void upload(files, images.length);
   }
 
-  async function handleFiles(files: FileList | File[]) {
-    const list = Array.from(files);
-    let position = images.length;
-    for (const file of list) {
-      await uploadOne(file, position);
-      position += 1;
-    }
-  }
-
-  // Optimistic, because it is a frequent, reversible, non-financial change and
-  // the operator is usually clicking through several photos in a row. Money and
-  // destructive actions are deliberately NOT optimistic.
   const makePrimary = useMutation({
     mutationFn: (image: LotImageAdmin) =>
       updateLotImage(lotId, image.id, { is_primary: true }),
@@ -278,51 +216,7 @@ export function LotImages({ lotId }: { lotId: string }) {
         <p className="mt-1 text-xs">JPEG, PNG or WebP · up to 10 MB each</p>
       </div>
 
-      {uploads.length > 0 && (
-        <ul className="mb-3 flex flex-col gap-1.5">
-          {uploads.map((item) => (
-            <li key={item.id} className="text-xs">
-              <div className="flex items-center justify-between gap-2">
-                <span className="truncate">{item.name}</span>
-                <span
-                  className={cn(
-                    "tnum shrink-0",
-                    item.status === "failed"
-                      ? "text-danger-ink"
-                      : item.status === "done"
-                        ? "text-success-ink"
-                        : "text-text-muted",
-                  )}
-                >
-                  {item.status === "failed"
-                    ? "failed"
-                    : item.status === "done"
-                      ? "done"
-                      : item.status === "confirming"
-                        ? "saving…"
-                        : `${Math.round(item.progress * 100)}%`}
-                </span>
-              </div>
-              <div className="mt-0.5 h-1 w-full overflow-hidden rounded bg-surface-sunken">
-                <div
-                  className={cn(
-                    "h-full transition-[width]",
-                    item.status === "failed" ? "bg-danger" : "bg-accent",
-                  )}
-                  style={{
-                    width: `${item.status === "failed" ? 100 : item.progress * 100}%`,
-                  }}
-                />
-              </div>
-              {item.error && (
-                <p role="alert" className="mt-0.5 text-danger-ink">
-                  {item.error}
-                </p>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+      <UploadProgress uploads={uploads} />
 
       {isPending ? (
         <Skeleton className="h-24 w-full" />

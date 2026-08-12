@@ -39,7 +39,6 @@ function freezeReasons(auction: AuctionAdmin, anyLotHasBid: boolean) {
 interface Draft {
   name: string;
   description: string;
-  image_url: string;
   starts_at: string;
   ends_at: string;
   currency_code: string;
@@ -52,7 +51,6 @@ function toDraft(auction: AuctionAdmin): Draft {
   return {
     name: auction.name,
     description: auction.description ?? "",
-    image_url: auction.image_url ?? "",
     starts_at: auction.starts_at,
     ends_at: auction.ends_at,
     currency_code: auction.currency_code,
@@ -105,9 +103,6 @@ export function AuctionEditForm({
     if (draft.name !== auction.name) patch.name = draft.name;
     if (draft.description !== (auction.description ?? "")) {
       patch.description = draft.description || null;
-    }
-    if (draft.image_url !== (auction.image_url ?? "")) {
-      patch.image_url = draft.image_url || null;
     }
     if (!frozen.starts_at && draft.starts_at !== auction.starts_at) {
       patch.starts_at = draft.starts_at;
@@ -213,14 +208,6 @@ export function AuctionEditForm({
               onChange={(e) =>
                 setDraft({ ...draft, description: e.target.value })
               }
-            />
-          </Field>
-
-          <Field label="Cover image URL" htmlFor="a-image">
-            <Input
-              id="a-image"
-              value={draft.image_url}
-              onChange={(e) => setDraft({ ...draft, image_url: e.target.value })}
             />
           </Field>
 

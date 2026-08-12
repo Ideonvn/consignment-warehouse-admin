@@ -125,6 +125,36 @@ export function cancelAuction(
   });
 }
 
+/* --------------------------------------------------------- auction image */
+
+export function presignAuctionImage(
+  auctionId: string,
+  body: PresignRequestInput,
+): Promise<PresignResult> {
+  return apiRequest(`/admin/auctions/${auctionId}/image/presign`, {
+    method: "POST",
+    body,
+    schema: presignResultSchema,
+  });
+}
+
+export function confirmAuctionImage(
+  auctionId: string,
+  storageKey: string,
+): Promise<AuctionAdmin> {
+  return apiRequest(`/admin/auctions/${auctionId}/image`, {
+    method: "POST",
+    body: { storage_key: storageKey },
+    schema: auctionAdminSchema,
+  });
+}
+
+export function deleteAuctionImage(auctionId: string): Promise<void> {
+  return apiRequestVoid(`/admin/auctions/${auctionId}/image`, {
+    method: "DELETE",
+  });
+}
+
 /* -------------------------------------------------------- increment rules */
 
 export function listIncrementRules(

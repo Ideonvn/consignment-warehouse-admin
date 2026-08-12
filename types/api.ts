@@ -106,8 +106,28 @@ export const auctionAdminSchema = z.object({
   created_at: z.string(),
   updated_at: z.string(),
   lot_count: z.number(),
+  /**
+   * Set only when the image was uploaded here rather than pointed at.
+   * Admin-only, and its value is never rendered — it exists so the UI can tell
+   * an uploaded image from an external URL.
+   */
+  image_storage_key: z.string().nullable(),
 });
 export type AuctionAdmin = z.infer<typeof auctionAdminSchema>;
+
+/** Which of the three image states an auction is in. */
+export type AuctionImageState = "none" | "external" | "uploaded";
+
+export function auctionImageState(auction: {
+  image_url: string | null;
+  image_storage_key: string | null;
+}): AuctionImageState {
+  if (!auction.image_url) return "none";
+  return auction.image_storage_key ? "uploaded" : "external";
+}
+
+/** The backend accepts only http(s) for image_url; anything else is a 422. */
+export const IMAGE_URL_RE = /^https?:\/\/\S+$/i;
 
 /** PATCH / cancel responses carry the blast radius alongside the auction. */
 export const auctionMutationSchema = auctionAdminSchema.extend({
@@ -309,6 +329,13 @@ export const presignResultSchema = z.object({
   expires_in: z.number(),
 });
 export type PresignResult = z.infer<typeof presignResultSchema>;
+
+export const confirmAuctionImageSchema = z.object({
+  storage_key: z.string(),
+});
+export type ConfirmAuctionImageInput = z.infer<
+  typeof confirmAuctionImageSchema
+>;
 
 export const confirmImageSchema = z.object({
   storage_key: z.string(),

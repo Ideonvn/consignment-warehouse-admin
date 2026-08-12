@@ -47,6 +47,30 @@ sending one subscribe per group, capped at 30 messages. It now sends the per-lot
 map the backend added, which is both correct and fewer messages; the chunk size
 dropped to 40 lot ids per message because the map repeats each id.
 
+**The cover image lives outside the edit form.** `image_url` is deliberately not
+a frozen field — an auction keeps its name, description and image editable once
+bidding starts — but the edit form is where the freezing rules live, so keeping
+the image there risked it being caught by them. Moving it to its own control
+also removes a real hazard: the form held `image_url` in its draft state, so
+saving an unrelated field after an upload would have written a stale URL back
+over the uploaded image.
+
+**Upload and URL are presented as peers, not as a primary and a fallback.** The
+two options sit side by side with the same weight. The only difference stated is
+the consequence — an external link can break and take the image with it, an
+uploaded file cannot — rather than implying one is the proper way. `image_storage_key`
+is used solely to tell the two apart and is never rendered.
+
+**On the create form a chosen file disables the URL field.** There is one image
+and it comes from one place; letting both be set would mean guessing which the
+operator meant.
+
+**A failed cover image never costs you the auction.** Presign is scoped to an
+auction that exists, so the create form defers the upload until after creation —
+the same shape as the increment rules below. If that upload fails the auction
+still exists and the operator is told the image did not attach, with the detail
+screen ready to retry.
+
 **Increment rules on the create form are applied after creation.** Rules can only
 be attached to an auction that exists, so the create page collects them locally
 and POSTs them once the auction is created. If a rule is rejected the auction is

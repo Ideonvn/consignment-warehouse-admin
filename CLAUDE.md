@@ -151,6 +151,23 @@ in `onNeedsRefetch` for that reason. Do not remove it. Related: the fallback is
 also *visible* — a gap filled silently while the socket looks healthy is a lie
 about staleness.
 
+**The auction cover image is not frozen.** Auctions keep name, description and
+image editable after bidding starts, so the image control sits *outside*
+`AuctionEditForm` — that component is where the freeze rules live, and anything
+put inside it risks inheriting them. Two fields describe three states and the
+operator should be able to tell which one they are in: no `image_url` is "none";
+`image_url` without `image_storage_key` is an external link someone else hosts;
+both set is an upload of ours. `auctionImageState()` in `types/api.ts` is the one
+place that mapping lives. Uploading and linking are peers — neither is the
+"proper" way — and `image_storage_key` is admin-only, used only to tell the
+states apart, never rendered.
+
+Replacement is server-side: setting a new image drops the old object either way
+round, so never build a delete-then-upload flow. Presign is scoped to an auction
+that already exists, which is why the create form collects the file and applies
+it *after* creation — and why a failed image there is reported but never
+discards the created auction.
+
 **Images: presign → direct upload to storage → confirm.** The API never sees the
 bytes. Append **every entry of `fields` to the `FormData` first, then the file
 last** — S3 POST policies require the file to be the final field — and POST to
@@ -160,6 +177,13 @@ image and send them; the server does not decode the file. The size cap is
 enforced by the storage policy itself, so an oversized file fails at the storage
 step even if the client-side check is bypassed — that rejection needs different
 wording from an API validation error, because one means the bytes never landed.
+
+That whole sequence is `useDirectUpload` (`lib/api/use-direct-upload.ts`), shared
+by the lot gallery and the auction cover image, sitting on the transport rules in
+`lib/api/upload.ts`. It owns the validate → presign → upload → confirm state
+machine, per-file progress, and the storage-vs-API error wording. A third
+uploader calls the hook with different presign/confirm callbacks — do not copy
+the sequence, it is exactly the kind of thing that drifts.
 
 ## Theming
 
