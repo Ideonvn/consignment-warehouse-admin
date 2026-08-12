@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Playwright MCP writes snapshots, screenshots and console logs here.
+.playwright-mcp/

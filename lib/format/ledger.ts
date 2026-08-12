@@ -106,8 +106,11 @@ export function describeEffect(
 
   const delta = resolved === "credit" ? amountMinor : -amountMinor;
   const after = describeBalance(balanceMinor + delta, currency);
+  // Only "Settled" needs lowercasing to sit mid-sentence; lowercasing the whole
+  // string would turn the "R" of a formatted amount into an "r".
+  const tail = after.tone === "settled" ? "settled" : after.text;
   return `${resolved === "credit" ? "Adds" : "Takes off"} ${formatMoney(
     amountMinor,
     currency,
-  )} — leaves them ${after.text.toLowerCase()}.`;
+  )} — leaves them ${tail}.`;
 }

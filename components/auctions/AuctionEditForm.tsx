@@ -40,6 +40,31 @@ function freezeReasons(auction: AuctionAdmin, anyLotHasBid: boolean) {
   };
 }
 
+/** What each field is called on screen, for messages the API phrases as columns. */
+const FIELD_LABELS: Record<string, string> = {
+  name: "Name",
+  description: "Description",
+  slug: "Slug",
+  starts_at: "Opens",
+  ends_at: "Closes",
+  currency_code: "Currency",
+  anti_snipe_window_seconds: "Anti-snipe window",
+  anti_snipe_extension_seconds: "Extension",
+  max_extensions: "Max extensions",
+  deposit_amount_minor: "Bidder deposit",
+  buyers_premium_bps: "Buyer's premium",
+};
+
+/** Swap the column name out of a frozen-field message for its on-screen label. */
+function humaniseFrozen(field: string, detail: string): string {
+  const label = FIELD_LABELS[field];
+  if (!label) return detail;
+  const swapped = detail.replaceAll(field, label);
+  // If the message never named the column, lead with the label so the operator
+  // still knows which of the fields the complaint is about.
+  return swapped === detail ? `${label}: ${detail}` : swapped;
+}
+
 interface Draft {
   name: string;
   description: string;
@@ -162,8 +187,11 @@ export function AuctionEditForm({
     },
     onError: (error) => {
       if (isApiError(error) && error.kind === "frozen_field" && error.field) {
-        setFrozenField({ field: error.field, message: error.detail });
-        toast.error(`${error.field} cannot be changed: ${error.detail}`);
+        // The API phrases these as "<column> cannot be changed…". Keep its
+        // reason, but say the name the operator sees on the field they edited.
+        const message = humaniseFrozen(error.field, error.detail);
+        setFrozenField({ field: error.field, message });
+        toast.error(message);
       } else {
         toast.error(errorMessage(error));
       }

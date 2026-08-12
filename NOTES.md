@@ -153,18 +153,44 @@ they existed for are gone:
 
 ### Still open
 
-1. **`GET /admin/users/{id}/ledger` and `GET .../participants` do not send
-   `X-Has-More`.** The brief says the statement carries it and CORS already
-   exposes the header, but neither endpoint sets it (`GET /lots/{id}/bids`
-   does). Both clients read it when present and otherwise fall back to "a full
-   page means there may be more", which over-reports a next page when the count
-   is an exact multiple of the page size.
+1. **The two ADMIN paged endpoints do not send `X-Has-More`.** Specifically
+   `GET /admin/users/{id}/ledger` and `GET /admin/auctions/{id}/participants`.
+   The bidder-facing `GET /me/account` does set it (`app/api/v1/account.py:40`,
+   `"true" if len(rows) == limit else "false"`), as does `GET /lots/{id}/bids` —
+   so this is an inconsistency between the admin and account surfaces rather
+   than a missing feature. Both admin clients read the header when present and
+   otherwise fall back to "a full page means there may be more", which
+   over-reports a next page when the count is an exact multiple of the page
+   size. Lifting the one line from `account.py` into the two admin handlers
+   would close it.
 
 2. **The OTP endpoint is rate-limited per source address and per phone.** With
    only two admin accounts in the seed it is possible to lock yourself out of
    the console for an hour, which has cost real time in several verification
    runs. A local-only bypass, or a higher limit while `APP_ENV=local`, would
    help.
+
+### Reported and fixed upstream during this round
+
+**`POST /admin/auctions` accepted `deposit_amount_minor` and
+`buyers_premium_bps` and then silently dropped them.** Both were declared on
+`AuctionCreateIn` and validated, but the handler built its `Auction(...)` by
+listing columns by hand and never passed those two, so every auction was
+created with a zero deposit and a zero premium no matter what was sent. It
+reproduced with a bare `curl` as readily as through the form, which is what
+ruled the portal out as the cause. A new auction therefore gated nobody and
+charged no premium, and nothing said so until money was involved.
+
+The backend now builds the row from the payload's own fields
+(`app/api/v1/admin_auctions.py`), with a contract test asserting the round
+trip. Verified against the running API: a single POST from the create form now
+comes back with `deposit_amount_minor: 125050` and `buyers_premium_bps: 1250`.
+The portal briefly carried a follow-up `PATCH` to work around it; that has been
+removed rather than left in as a permanent second request.
+
+The lesson for this repo is in the verification list, not the code: the bug was
+invisible to every check that trusted the form's own state, and showed up the
+moment the value was read back from the API after saving.
 
 ### Corrected — the CORS-on-errors report was wrong
 
@@ -321,6 +347,54 @@ problems surfaced and are fixed:
   against R4 050 on the server. The overlay is now cleared when a gap forces a
   refetch, which is exactly the case it must not win. Re-tested: after a missed
   bid the monitor showed R8 250,00 / 10 bids, matching the server exactly.
+
+## Ledger, participants and auction money — verification (2026-08-12)
+
+Run against the live backend, every result read back from the API rather than
+from the form that produced it.
+
+- **Deposit and premium on both forms.** Create: a single POST comes back
+  `125050` / `1250`. Edit: changing them to `300000` / `750` reads back
+  unchanged. The create path is what surfaced the dropped-field bug above.
+- **A deposit moves the balance.** R 0,01 against a bidder sitting one cent
+  short took him from `R 4 999,99 in credit` to `R 5 000,00`, statement and
+  balance panel agreeing.
+- **A reversal restores it, and both entries stay.** The correction posts as
+  `Correction` with the reason inline; the balance returns to `R 4 999,99`.
+- **A second reversal is refused clearly.** The API 409s instantly, and the
+  dialog says *"That entry has already been reversed. Reload the statement to
+  see the existing correction."* — not a generic failure. The row that has been
+  reversed now reads `Reversed` instead of offering the button, derived from the
+  `reverses_entry_id` on the correction; the 409 stays handled because an older
+  entry's correction can sit on a page that is not loaded.
+- **Adjustments both ways, direction enforced.** `+R 10,00` then `−R 4,00` left
+  `R 5 005,99`. Submitting an adjustment with no direction is refused before it
+  is sent. The API independently refuses `direction` on `deposit`, `payment` and
+  `refund` (422) and requires it on `adjustment` — matching what the form does.
+- **A negative amount cannot be entered.** `-50` is rejected at the input with
+  *"Amount cannot be negative"*, and pressing the button anyway posts nothing.
+- **Eligibility follows the balance with no approval step.** The ineligible list
+  went from 12 to 11 the moment that cent was recorded, and the bidder moved to
+  `Can bid: Yes` at exactly the threshold. Eligible-who-has-bid, eligible-never-
+  bid and ineligible rows all render correctly.
+- **Deposit and premium freeze once a lot has a bid**, with the reason shown on
+  each field.
+- **The frozen-field 409 works as a backstop.** Verified by racing it properly:
+  the edit form was opened while an auction had no bids, a real bid was then
+  placed through the bidder API, and the save was refused by the server. Both
+  fields were exercised this way. The message is now phrased with the field's
+  on-screen name — *"Buyer's premium cannot be changed once bidding has
+  started"* — rather than echoing the column name back at the operator.
+
+Two display bugs were found and fixed in the process: the effect preview
+lowercased the whole sentence and turned `R 5 000,00` into `r 5 000,00`, and the
+frozen-field toast printed `deposit_amount_minor` twice.
+
+**On the environment:** the database was reseeded by another session partway
+through this run (20:17 UTC), which wiped the fixtures and killed the browser
+session — the same cause identified for the earlier "unknown refresh token"
+deaths. Every result above was either observed before that point or re-run
+after it against the new seed.
 
 ### Still not verified
 

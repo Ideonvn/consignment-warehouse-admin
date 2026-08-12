@@ -47,6 +47,15 @@ export function UserLedger({ userId }: { userId: string }) {
   const entries = statement?.entries ?? [];
   const summary = describeBalance(balance, currency);
 
+  // A correction names what it undoes, so the entries on this page tell us which
+  // of them can still be reversed. Only this page, though — the correction for
+  // an older entry may sit on a later one, which is why the 409 stays handled.
+  const reversedIds = new Set(
+    entries
+      .map((entry) => entry.reverses_entry_id)
+      .filter((id): id is string => Boolean(id)),
+  );
+
   function invalidate() {
     void client.invalidateQueries({ queryKey: queryKeys.ledgerRoot(userId) });
     void client.invalidateQueries({ queryKey: queryKeys.user(userId) });
@@ -149,6 +158,7 @@ export function UserLedger({ userId }: { userId: string }) {
                   const isCredit = entry.amount_minor >= 0;
                   const magnitude = Math.abs(entry.amount_minor);
                   const isCorrection = entry.entry_type === "reversal";
+                  const alreadyReversed = reversedIds.has(entry.id);
                   return (
                     <tr
                       key={entry.id}
@@ -186,7 +196,11 @@ export function UserLedger({ userId }: { userId: string }) {
                           : formatMoney(entry.balance_after_minor, currency)}
                       </td>
                       <td className="px-2.5 py-1.5 text-right">
-                        {!isCorrection && (
+                        {isCorrection ? null : alreadyReversed ? (
+                          <span className="text-xs text-text-muted">
+                            Reversed
+                          </span>
+                        ) : (
                           <Button
                             size="sm"
                             variant="ghost"

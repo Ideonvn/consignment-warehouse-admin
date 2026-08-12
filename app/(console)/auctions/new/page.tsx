@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { IncrementRulesEditor } from "@/components/auctions/IncrementRulesEditor";
@@ -447,26 +447,38 @@ export default function NewAuctionPage() {
           </div>
 
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <Field
-              label="Bidder deposit"
-              hint="What someone must hold in credit before they can bid here. Zero means no deposit."
-            >
-              <MoneyInput
-                value={values.deposit_amount_minor ?? 0}
-                currency={values.currency_code || "ZAR"}
-                onChange={(minor) =>
-                  setValue("deposit_amount_minor", minor ?? 0, {
-                    shouldValidate: true,
-                  })
-                }
-              />
-            </Field>
+            {/*
+              * Controller, not setValue: these are custom inputs with no DOM
+              * node for react-hook-form to register, so this is the wiring that
+              * keeps what the operator typed, what useWatch renders and what
+              * handleSubmit posts as one value rather than three.
+              */}
+            <Controller
+              control={control}
+              name="deposit_amount_minor"
+              render={({ field }) => (
+                <Field
+                  label="Bidder deposit"
+                  hint="What someone must hold in credit before they can bid here. Zero means no deposit."
+                >
+                  <MoneyInput
+                    value={field.value ?? 0}
+                    currency={values.currency_code || "ZAR"}
+                    onChange={(minor) => field.onChange(minor ?? 0)}
+                  />
+                </Field>
+              )}
+            />
 
-            <PremiumField
-              bps={values.buyers_premium_bps ?? 0}
-              onChange={(bps) =>
-                setValue("buyers_premium_bps", bps, { shouldValidate: true })
-              }
+            <Controller
+              control={control}
+              name="buyers_premium_bps"
+              render={({ field }) => (
+                <PremiumField
+                  bps={field.value ?? 0}
+                  onChange={(bps) => field.onChange(bps)}
+                />
+              )}
             />
           </div>
 
