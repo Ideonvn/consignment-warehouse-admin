@@ -32,7 +32,14 @@ import type { LedgerDirection, LedgerEntryAdmin, LedgerEntryType } from "@/types
  * corrected by posting a reversal that points at the original, and both stay on
  * the record — that is what makes the statement reconcilable against a bank.
  */
-export function UserLedger({ userId }: { userId: string }) {
+export function UserLedger({
+  userId,
+  paymentReference,
+}: {
+  userId: string;
+  /** Defaulted into the reference field so it is not typed off a bank statement. */
+  paymentReference?: string | null;
+}) {
   const client = useQueryClient();
   const [page, setPage] = useState(0);
   const { data, isPending, error, refetch, isFetching } = useUserLedger(
@@ -107,6 +114,7 @@ export function UserLedger({ userId }: { userId: string }) {
         userId={userId}
         currency={currency}
         balanceMinor={balance}
+        paymentReference={paymentReference}
         onPosted={invalidate}
       />
 
@@ -310,19 +318,30 @@ function RecordEntry({
   userId,
   currency,
   balanceMinor,
+  paymentReference,
   onPosted,
 }: {
   userId: string;
   currency: string;
   balanceMinor: number;
+  paymentReference?: string | null;
   onPosted: () => void;
 }) {
   const [type, setType] = useState<LedgerEntryType>("deposit");
   const [amount, setAmount] = useState<number | null>(null);
   const [direction, setDirection] = useState<LedgerDirection | "">("");
-  const [reference, setReference] = useState("");
+  const [reference, setReference] = useState(paymentReference ?? "");
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  // The reference arrives with the user record, which loads after this mounts.
+  // Reconciled during render rather than in an effect, and only while the field
+  // is untouched, so it never overwrites something the operator has typed.
+  const [lastDefault, setLastDefault] = useState(paymentReference ?? "");
+  if ((paymentReference ?? "") !== lastDefault) {
+    if (reference === lastDefault) setReference(paymentReference ?? "");
+    setLastDefault(paymentReference ?? "");
+  }
 
   const meta = LEDGER_ENTRY_META[type];
   const needsDirection = meta.effect === "either";
@@ -340,7 +359,8 @@ function RecordEntry({
     onSuccess: (entry) => {
       onPosted();
       setAmount(null);
-      setReference("");
+      // Back to their reference, not blank: the next entry is usually theirs too.
+      setReference(paymentReference ?? "");
       setDescription("");
       setDirection("");
       setError(null);

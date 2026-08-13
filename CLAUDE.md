@@ -179,6 +179,29 @@ chasing the wrong person. `lib/format/ledger.ts` owns that wording and the
 entry-type labels (`lot_won` is "Lot won", `buyers_premium` is "Buyer's
 premium", `reversal` is "Correction").
 
+**Outstanding is a query too, and settling is just a `payment`.**
+`GET /admin/outstanding` is computed from the ledger the same way participants
+are — most owing first, `X-Has-More` and all. There is no mark-as-paid endpoint
+and there should not be one: the row action posts an ordinary `payment` through
+`POST /admin/users/{id}/ledger`, so the ledger keeps one write path and a
+settlement is reversible like anything else. **Render `amount_owing_minor`, never
+`-balance_minor`** — the magnitude is carried explicitly so a forgotten minus
+sign cannot turn a credit into a debt on the screen the operator chases people
+from. The amount and reference stay **editable in the confirm dialog**, because a
+bank line rarely matches a balance to the cent and a one-click button beside a
+list of names is how the wrong person gets credited.
+
+The sidebar badge counts **people, not rands**: the operator works the list name
+by name, a total moves without the worklist getting shorter, and no rand figure
+is readable at badge size. The total belongs on the screen, where there is room.
+
+**`payment_reference` is the default, everywhere money is recorded.** It comes
+with the user record, so the ledger form and the mark-as-paid dialog both
+pre-fill it — editable, since a mistyped bank line has to be correctable — and
+it is shown on the user detail screen because it is what an operator quotes when
+someone asks how to pay. It arrives after the form mounts, so the default is
+reconciled during render and only while the field is untouched.
+
 **Participants are a query, not a roster.** `GET /admin/auctions/{id}/participants`
 is computed on read — there is no participant table, no registration and no
 approval step, so **do not build an "approve" control**. Eligibility falls out of

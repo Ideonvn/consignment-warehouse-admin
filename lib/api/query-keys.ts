@@ -24,6 +24,11 @@ export const queryKeys = {
   participants: (auctionId: string, eligible: boolean | undefined) =>
     ["auction", auctionId, "participants", eligible ?? "all"] as const,
 
+  /** Everyone who owes money, one page at a time, plus the count for the nav. */
+  outstandingRoot: ["outstanding"] as const,
+  outstanding: (page: number) => ["outstanding", "page", page] as const,
+  outstandingCount: ["outstanding", "count"] as const,
+
   /** Every reserve-not-met lot across every auction, one page at a time. */
   decisionsRoot: ["decisions"] as const,
   decisions: (page: number) => ["decisions", "page", page] as const,

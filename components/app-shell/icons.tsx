@@ -110,3 +110,15 @@ export function MonitorIcon(props: IconProps) {
     </Svg>
   );
 }
+
+/** A banknote: the outstanding-statements list is about money owed. */
+export function MoneyIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="1.5" y="4" width="13" height="8" rx="1" />
+      <circle cx="8" cy="8" r="1.8" />
+      <path d="M4 8h.01" />
+      <path d="M12 8h.01" />
+    </Svg>
+  );
+}

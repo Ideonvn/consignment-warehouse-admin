@@ -40,6 +40,8 @@ import {
   type LotAdminSummary,
   type LotImageAdmin,
   type LotStatus,
+  outstandingListSchema,
+  type Outstanding,
   type Participant,
   type PresignRequestInput,
   type PresignResult,
@@ -507,6 +509,36 @@ export function reverseLedgerEntry(
     body: { reason },
     schema: ledgerEntryAdminSchema,
   });
+}
+
+/* ----------------------------------------------------------- outstanding */
+
+export interface ListOutstandingParams {
+  limit?: number;
+  offset?: number;
+}
+
+export interface OutstandingPage {
+  items: Outstanding[];
+  hasMore: boolean;
+}
+
+/**
+ * Everyone with a negative balance, most owing first.
+ *
+ * This one does send `X-Has-More`, so unlike the ledger and participants lists
+ * there is no "a full page means there may be more" guess to make.
+ */
+export async function listOutstanding(
+  params: ListOutstandingParams = {},
+  signal?: AbortSignal,
+): Promise<OutstandingPage> {
+  const result = await apiRequestPaged("/admin/outstanding", {
+    schema: outstandingListSchema,
+    query: { limit: params.limit ?? 50, offset: params.offset ?? 0 },
+    signal,
+  });
+  return { items: result.data, hasMore: result.hasMore };
 }
 
 /* ----------------------------------------------------------- participants */

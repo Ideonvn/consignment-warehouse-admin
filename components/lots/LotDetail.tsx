@@ -108,7 +108,7 @@ export function LotDetail({ lotId }: { lotId: string }) {
 
       <Panel
         className="mb-3"
-        bodyClassName="grid gap-4 sm:grid-cols-3 lg:grid-cols-6"
+        bodyClassName="grid gap-4 sm:grid-cols-3 lg:grid-cols-7"
       >
         <DataPoint label="Starting price">
           <span className="tnum">
@@ -128,6 +128,20 @@ export function LotDetail({ lotId }: { lotId: string }) {
           >
             {formatMoney(lot.current_bid_minor, currency, { emptyAs: "—" })}
           </span>
+        </DataPoint>
+        <DataPoint label="Bid increment">
+          {/* Null means this lot has no override and follows the auction's bands. */}
+          {lot.bid_increment_minor === null ||
+          lot.bid_increment_minor === undefined ? (
+            <span className="text-xs text-text-muted">Auction bands</span>
+          ) : (
+            <span className="tnum">
+              {formatMoney(lot.bid_increment_minor, currency)}
+              <span className="block text-xs text-text-muted">
+                this lot only
+              </span>
+            </span>
+          )}
         </DataPoint>
         <DataPoint label="Bids">
           <span className="tnum">{lot.bid_count}</span>

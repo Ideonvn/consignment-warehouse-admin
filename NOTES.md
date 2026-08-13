@@ -76,6 +76,33 @@ ineligible filter because that is the working list: the people to chase. Every
 row links to that person's ledger, so recording the deposit that makes them
 eligible is one hop.
 
+**The Outstanding badge counts people, not rands.** Both were on the table. The
+operator works that screen one name at a time — read a row, phone someone,
+record what arrives — so the number of names left is the figure that maps onto an
+action, and it shrinks only when someone is actually dealt with. A rand total
+moves every time any balance anywhere changes while the worklist stays exactly as
+long, and "R118 667,50" is not legible at badge size next to a 14px label. The
+total is on the screen itself, above the table, where there is room to read it
+and it sits next to the rows it is the sum of.
+
+**Mark-as-paid keeps the amount and the reference editable.** It would have been
+less code to post the full balance on one click. A bank line rarely matches a
+balance to the cent — someone pays a round number, or settles two invoices at
+once — and a single button beside a list of names is precisely how the wrong
+person gets credited. The dialog states what will be posted and what the balance
+becomes, and warns when the amount exceeds the debt, because that leaves someone
+in credit rather than settled. Partial payments are the normal case, not an edge
+case: the row stays on the list with a smaller figure.
+
+**The reference default is reconciled during render, not in an effect.** The
+user record carries `payment_reference` and loads after the ledger form mounts,
+so the field would otherwise be empty on first paint and require an effect to
+fill — which is a lint error in this codebase and, worse, would clobber anything
+typed in the meantime. It is applied during render and only while the field
+still holds the previous default, so an operator who has started typing keeps
+what they typed. After a post it resets to their reference rather than to blank,
+since the next entry is usually theirs as well.
+
 **The buyer's premium is entered as a percentage and stored as basis points.**
 The operator types 12.5 and the field says "Stored as 1250 basis points"
 underneath. Echoing the stored value is the point: a rate that quietly means a
@@ -162,7 +189,9 @@ they existed for are gone:
    otherwise fall back to "a full page means there may be more", which
    over-reports a next page when the count is an exact multiple of the page
    size. Lifting the one line from `account.py` into the two admin handlers
-   would close it.
+   would close it. **`GET /admin/outstanding` already does it correctly** — it
+   fetches `limit + 1` and sets the header from that, which is the better
+   version of the same idea and the one worth copying into the other two.
 
 2. **The OTP endpoint is rate-limited per source address and per phone.** With
    only two admin accounts in the seed it is possible to lock yourself out of
@@ -395,6 +424,39 @@ through this run (20:17 UTC), which wiped the fixtures and killed the browser
 session — the same cause identified for the earlier "unknown refresh token"
 deaths. Every result above was either observed before that point or re-run
 after it against the new seed.
+
+## Outstanding, mark-as-paid and the lot increment — verification (2026-08-13)
+
+- **Ordering and filtering.** `GET /admin/outstanding` returned the three seeded
+  debtors (`+27820000017`, `+27820000019`, `+27820000020`) in descending order of
+  what they owe, with `X-Has-More: false`. Checked programmatically that every
+  row's balance is negative and the order matches `amount_owing_minor` sorted
+  descending. A bidder sitting on R20 000,00 of credit does not appear, and
+  neither does someone settled at exactly zero.
+- **Partial payment.** R10 000,00 against a R21 635,00 debt, with the reference
+  edited to `MC-EDITED-01` before posting: the row stayed on the list showing
+  R11 635,00, and the entry landed with the edited reference.
+- **Full payment removes the row.** Re-opening the dialog pre-filled the *new*
+  balance (R11 635,00) and reset the reference to their own. After posting, the
+  row left the list, the page total dropped, and the sidebar badge went 3 → 2.
+  Their ledger reads two `payment` entries and a zero balance.
+- **Overpaying is flagged, not blocked.** R40 000,00 against a R31 640,00 debt
+  previews *"leaves Chantelle du Toit R 8 360,00 in credit. That is more than
+  they owe, so they end up in credit."*
+- **Reference defaults.** Pre-filled in the mark-as-paid dialog and in the ledger
+  form, shown on the user detail screen, and — checked by posting one — actually
+  submitted with the entry rather than merely displayed.
+- **`bid_increment_minor` on lot detail.** Spring Collectables lot 7 shows
+  "R 333,00 · this lot only"; a lot without an override shows "Auction bands".
+  Setting an override of R25,00 through the edit form read back as `2500` from
+  the API and the stat panel followed. Reverted afterwards.
+- **`my_swipe`** was not referenced anywhere in this app, so its removal from
+  `LotAdminOut` needed no change.
+
+**On the environment:** the same session that reseeded the database during the
+previous round did so twice more during this one — once six seconds after a
+browser login, which killed the session mid-dialog. The results above were
+gathered after re-authenticating against the current seed.
 
 ### Still not verified
 

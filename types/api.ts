@@ -396,6 +396,8 @@ export const adminUserSchema = z.object({
   first_name: z.string().nullable(),
   last_name: z.string().nullable(),
   email: z.string().nullable(),
+  /** What the bidder quotes on a bank transfer. Defaulted into every reference field. */
+  payment_reference: z.string().nullable(),
   status: userStatusSchema,
   role: userRoleSchema,
   is_phone_verified: z.boolean(),
@@ -504,6 +506,29 @@ export const participantSchema = z.object({
   bid_count: z.number(),
 });
 export type Participant = z.infer<typeof participantSchema>;
+
+/**
+ * One debtor on the outstanding list, computed from the ledger the same way the
+ * participants list is — there is no debtors table to drift.
+ *
+ * `balance_minor` is signed and `amount_owing_minor` is the same figure as a
+ * positive magnitude. Render the magnitude: negating a balance in a component is
+ * how a credit ends up displayed as a debt.
+ */
+export const outstandingSchema = z.object({
+  user_id: z.string(),
+  handle: z.string(),
+  phone_e164: z.string(),
+  first_name: z.string().nullable(),
+  last_name: z.string().nullable(),
+  payment_reference: z.string().nullable(),
+  balance_minor: z.number(),
+  amount_owing_minor: z.number(),
+  currency_code: z.string(),
+  last_entry_at: z.string(),
+});
+export type Outstanding = z.infer<typeof outstandingSchema>;
+export const outstandingListSchema = z.array(outstandingSchema);
 
 /* --------------------------------------------------------------- realtime */
 

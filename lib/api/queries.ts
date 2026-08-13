@@ -145,6 +145,52 @@ export function useParticipants(
   });
 }
 
+/* ------------------------------------------------------------ outstanding */
+
+export const OUTSTANDING_PAGE_SIZE = 50;
+
+/** Debtors, most owing first. The server orders them; nothing is re-sorted here. */
+export function useOutstanding(page = 0) {
+  const enabled = useAuthed();
+  return useQuery<api.OutstandingPage>({
+    queryKey: queryKeys.outstanding(page),
+    enabled,
+    staleTime: 30_000,
+    placeholderData: (previous) => previous,
+    queryFn: ({ signal }) =>
+      api.listOutstanding(
+        {
+          limit: OUTSTANDING_PAGE_SIZE,
+          offset: page * OUTSTANDING_PAGE_SIZE,
+        },
+        signal,
+      ),
+  });
+}
+
+/**
+ * The sidebar badge counts **people**, not rands.
+ *
+ * The operator works this screen person by person — they phone someone, then
+ * record what arrives — so the number of names left is the thing that maps onto
+ * an action. A rand total moves every time any balance changes without the
+ * worklist getting any shorter, and "R70 392,50" cannot be read at badge size
+ * anyway. The total is on the screen itself, where there is room for it.
+ *
+ * Its own small query, like the decisions badge, so it does not depend on which
+ * page of the list is open.
+ */
+export function useOutstandingCount(): number {
+  const enabled = useAuthed();
+  const { data } = useQuery<api.OutstandingPage>({
+    queryKey: queryKeys.outstandingCount,
+    enabled,
+    staleTime: 30_000,
+    queryFn: ({ signal }) => api.listOutstanding({ limit: 200 }, signal),
+  });
+  return data?.items.length ?? 0;
+}
+
 /* -------------------------------------------------------------- decisions */
 
 export const DECISIONS_PAGE_SIZE = 50;

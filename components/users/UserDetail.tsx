@@ -189,7 +189,7 @@ export function UserDetail({ userId }: { userId: string }) {
         </DataPoint>
       </Panel>
 
-      <UserLedger userId={userId} />
+      <UserLedger userId={userId} paymentReference={user.payment_reference} />
 
       <Panel title="Account" className="mt-4">
         <dl className="grid gap-3 sm:grid-cols-2">
@@ -201,6 +201,17 @@ export function UserDetail({ userId }: { userId: string }) {
             <dt className="text-xs text-text-muted">Email</dt>
             <dd className="text-sm">
               {user.email ?? <span className="text-text-muted">none</span>}
+            </dd>
+          </div>
+          <div>
+            {/* What the operator quotes when this person asks how to pay. */}
+            <dt className="text-xs text-text-muted">Payment reference</dt>
+            <dd className="font-mono text-sm">
+              {user.payment_reference ?? (
+                <span className="font-sans text-text-muted">
+                  none — issued when they first owe money
+                </span>
+              )}
             </dd>
           </div>
           <div>

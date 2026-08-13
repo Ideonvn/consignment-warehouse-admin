@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useDecisionCount } from "@/lib/api/queries";
+import { useDecisionCount, useOutstandingCount } from "@/lib/api/queries";
 import { useAuctionContextStore } from "@/lib/ui/auction-context";
 import { cn } from "@/lib/utils";
 import {
   AuctionIcon,
   DecisionIcon,
   LotIcon,
+  MoneyIcon,
   MonitorIcon,
   UsersIcon,
 } from "./icons";
@@ -20,6 +21,8 @@ interface NavItem {
   match: (pathname: string) => boolean;
   disabledReason?: string;
   badge?: number;
+  /** What the badge count means, for screen readers. */
+  badgeLabel?: string;
 }
 
 export function Sidebar({
@@ -32,6 +35,7 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const decisions = useDecisionCount();
+  const outstanding = useOutstandingCount();
   const auction = useAuctionContextStore((s) => s.auction);
 
   const items: NavItem[] = [
@@ -63,6 +67,17 @@ export function Sidebar({
       icon: DecisionIcon,
       match: (p) => p.startsWith("/decisions"),
       badge: decisions,
+    },
+    {
+      // Counted in people, not rands: the operator works this list name by
+      // name, and a total moves without the worklist getting any shorter. The
+      // rand figure is on the screen, where there is room to read it.
+      href: "/outstanding",
+      label: "Outstanding",
+      icon: MoneyIcon,
+      match: (p) => p.startsWith("/outstanding"),
+      badge: outstanding,
+      badgeLabel: `${outstanding} owing money`,
     },
     {
       href: "/users",
@@ -97,7 +112,7 @@ export function Sidebar({
                   "tnum ml-auto rounded-full bg-warning px-1.5 py-0.5 text-[10px] font-semibold text-warning-fill-ink",
                   expanded ? "" : "hidden xl:inline-block",
                 )}
-                aria-label={`${item.badge} awaiting a decision`}
+                aria-label={item.badgeLabel ?? `${item.badge} awaiting a decision`}
               >
                 {item.badge}
               </span>
