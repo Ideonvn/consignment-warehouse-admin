@@ -35,8 +35,20 @@ export const phoneOtpProvider: AuthProvider = {
     identifier: "Mobile number",
     identifierHint:
       "Full international format, e.g. +27820000001. The backend does not infer a country code.",
-    secret: "6-digit code",
-    secretHint: "Sent by SMS. In local development the code is always 0000.",
+    // No digit count here on purpose. The backend decides how long a code is —
+    // six in production, the four-character 0000 locally — and a number in the
+    // label is an assertion this app cannot keep true. The bidder app needs a
+    // configured length because its input renders one box per digit; here it is
+    // only prose, and prose that needs a setting to stay honest is worse than
+    // prose that never claims anything.
+    secret: "Verification code",
+    // The local dev code is deliberately not mentioned. It is in the guides, the
+    // seed prints it, and anyone running this locally meets it within a minute —
+    // whereas an operator reading it on the real login screen is reading dev
+    // detail that does not apply to them. Gating it on an environment variable
+    // would be a setting, and a second place for the backend's OTP_DEV_CODE to
+    // drift away from.
+    secretHint: "Sent by SMS.",
   },
 
   validateIdentifier(value) {

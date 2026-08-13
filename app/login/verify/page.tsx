@@ -105,8 +105,11 @@ function VerifyForm() {
             inputMode="numeric"
             autoComplete="one-time-code"
             autoFocus
+            // Deliberately no placeholder: "0000" was the local dev code, so it
+            // showed every production operator a four-character example of a
+            // six-digit code. The hint below says where the code comes from.
+            // The cap is a ceiling, not a length — it accommodates both.
             maxLength={8}
-            placeholder="0000"
             className="tnum tracking-[0.4em]"
             value={code}
             invalid={Boolean(error)}
