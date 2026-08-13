@@ -398,6 +398,13 @@ export const adminUserSchema = z.object({
   email: z.string().nullable(),
   /** What the bidder quotes on a bank transfer. Defaulted into every reference field. */
   payment_reference: z.string().nullable(),
+  /**
+   * Whether email can reach this person. Unverified addresses are never routed
+   * to, and a bounced one is failing silently — between them they answer "I
+   * never got the notification", which is otherwise unanswerable.
+   */
+  email_verified_at: z.string().nullable(),
+  email_bounced_at: z.string().nullable(),
   status: userStatusSchema,
   role: userRoleSchema,
   is_phone_verified: z.boolean(),

@@ -200,7 +200,16 @@ export function UserDetail({ userId }: { userId: string }) {
           <div>
             <dt className="text-xs text-text-muted">Email</dt>
             <dd className="text-sm">
-              {user.email ?? <span className="text-text-muted">none</span>}
+              {user.email ? (
+                <>
+                  <span className="break-all">{user.email}</span>
+                  <EmailDelivery user={user} />
+                </>
+              ) : (
+                <span className="text-text-muted">
+                  none — SMS only
+                </span>
+              )}
             </dd>
           </div>
           <div>
@@ -393,5 +402,56 @@ function ChangeRoleDialog({
         </Field>
       </div>
     </Dialog>
+  );
+}
+
+/**
+ * Whether email actually reaches this person.
+ *
+ * This exists for one question an operator otherwise cannot answer: "I never got
+ * the notification." Unverified addresses are never routed to, so nothing was
+ * ever sent to them; a verified address that later hard-bounced is failing
+ * silently, and the person needs to be told to correct it. Bounced therefore
+ * reads as a problem rather than as another neutral timestamp.
+ *
+ * There is deliberately no control to verify an address from here. Verification
+ * means the person proving they control the mailbox — an operator ticking it off
+ * on their behalf would defeat the point and could put someone's auction mail
+ * into a stranger's inbox.
+ */
+function EmailDelivery({
+  user,
+}: {
+  user: { email_verified_at: string | null; email_bounced_at: string | null };
+}) {
+  // Bounced wins over verified: a bounced address has usually been verified too,
+  // and the failure is the part that needs acting on.
+  if (user.email_bounced_at) {
+    return (
+      <span className="mt-1 flex flex-col gap-0.5 rounded border border-danger-tint-border bg-danger-tint px-1.5 py-1 text-xs text-danger-ink">
+        <span className="font-semibold">
+          Bouncing — email is not arriving
+        </span>
+        <span>
+          Mail to this address failed on{" "}
+          {formatDateTime(user.email_bounced_at)}. Ask them for a corrected
+          address; they can only verify it themselves.
+        </span>
+      </span>
+    );
+  }
+
+  if (user.email_verified_at) {
+    return (
+      <span className="mt-0.5 block text-xs text-success-ink">
+        Verified {formatDateTime(user.email_verified_at)}
+      </span>
+    );
+  }
+
+  return (
+    <span className="mt-0.5 block text-xs text-warning-ink">
+      Not verified — nothing is sent to this address
+    </span>
   );
 }

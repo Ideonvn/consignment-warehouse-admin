@@ -94,6 +94,30 @@ becomes, and warns when the amount exceeds the debt, because that leaves someone
 in credit rather than settled. Partial payments are the normal case, not an edge
 case: the row stays on the list with a smaller figure.
 
+**Email delivery renders four states, not three.** The brief listed no email,
+verified and bounced. An address that exists but has never been verified is a
+fourth, and it is the one the seed is full of — 4 of the 4 addresses in it are
+unverified — so leaving it out would have shown an address with nothing beside
+it in exactly the case the feature exists to explain. It is the other half of
+the answer to "I never got the notification": nothing was ever sent, because
+unverified addresses are not routed to. It reads as a warning rather than a
+failure, since nothing is broken; it just cannot be relied on.
+
+**Bounced outranks verified when both are set.** A hard bounce almost always
+follows a verification — that is the sequence the fields describe — so showing
+"Verified 4 Jul" against an address that is currently failing would be true and
+useless. The failure is what needs acting on, so it takes the row.
+
+**There is no way to verify an address from this screen, deliberately.**
+Verification means the person proving they control the mailbox. An operator
+ticking it off on someone's behalf would defeat the point and could route auction
+mail — lot won, invoice, payment reference — into a stranger's inbox after a typo.
+The bounced state says the address must be corrected and re-verified by them.
+
+**Marketing preferences are not on the admin shapes and are not shown.** Consent
+belongs to the user, and nothing in this app sends marketing, so there is nothing
+for an operator to act on. Do not add them if they appear on a future schema.
+
 **The reference default is reconciled during render, not in an effect.** The
 user record carries `payment_reference` and loads after the ledger form mounts,
 so the field would otherwise be empty on first paint and require an effect to
@@ -452,6 +476,15 @@ after it against the new seed.
   the API and the stat panel followed. Reverted afterwards.
 - **`my_swipe`** was not referenced anywhere in this app, so its removal from
   `LotAdminOut` needed no change.
+
+**Email delivery states — verification (2026-08-13).** The seed carries no
+verified or bounced addresses, and there is no endpoint that sets either (by
+design — verification is the user's to do), so `email_verified_at` and
+`email_bounced_at` were set directly on two seeded admin accounts through psql,
+all four states were checked in both themes, and the rows were reverted
+afterwards. Measured contrast for the new pairings, light / dark: verified text
+on surface 5.02 / 8.84, unverified text on surface 7.09 / 9.25, bounced text on
+its tint 7.60 / 8.22 — all above the 4.5:1 that 12px text needs.
 
 **On the environment:** the same session that reseeded the database during the
 previous round did so twice more during this one — once six seconds after a
