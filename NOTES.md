@@ -94,6 +94,26 @@ becomes, and warns when the amount exceeds the debt, because that leaves someone
 in credit rather than settled. Partial payments are the normal case, not an edge
 case: the row stays on the list with a smaller figure.
 
+**Lot photos are held on the create form and attached after creation.** Listing
+twenty items used to be forty round trips: create the lot, open it, upload, go
+back. The auction create form had already solved this, so the lot form now does
+the same — files held with object URLs, order and primary chosen before anything
+is uploaded, applied once the lot exists. Position and primary are set as each
+photo is confirmed rather than patched afterwards, since the order was decided
+before the upload started and there is nothing to discover.
+
+**A created lot is never rolled back for a failed photo.** The lot is kept and
+the photos that failed move to a panel beside the form that names each failure,
+shows the previews, and offers three ways on: retry in place, open the lot, or
+discard. The form itself resets for the next lot regardless — the failed photos
+live in their own state precisely so they cannot be inherited by the next one.
+
+**`useDirectUpload.upload()` now returns per-file outcomes.** The create form has
+to know which files failed, and reading them out of the hook's `uploads` state
+does not work: the rows are auto-cleared on success, and a caller awaiting the
+batch holds a stale closure over that state anyway. The return value is additive,
+so the gallery and the cover image were untouched.
+
 **Email delivery renders four states, not three.** The brief listed no email,
 verified and bounced. An address that exists but has never been verified is a
 fourth, and it is the one the seed is full of — 4 of the 4 addresses in it are
@@ -448,6 +468,31 @@ through this run (20:17 UTC), which wiped the fixtures and killed the browser
 session — the same cause identified for the earlier "unknown refresh token"
 deaths. Every result above was either observed before that point or re-run
 after it against the new seed.
+
+## Photos on the lot create form — verification (2026-08-14)
+
+Run against the live backend with MinIO up, everything read back from the API.
+
+- **Three photos, one marked primary.** All three attached at positions 0/1/2 in
+  the order arranged, primary on the one chosen. Checked by fetching each stored
+  object and comparing its pixels against the three distinctly coloured fixtures
+  — the right *files* in the right slots, not just plausible metadata.
+- **No photos at all.** Lot created, zero images, no wasted calls.
+- **A real storage failure.** Forced by stopping MinIO mid-session: the lot was
+  created and listed, the panel said *"Storage refused the upload"* — the wording
+  reserved for bytes that never landed — and both previews were held. MinIO back
+  up, "Try these again" attached both to the same lot.
+- **No leakage across lots.** Three lots in a row — red photo, none, blue photo —
+  came back holding exactly that: red, nothing, blue.
+- **Object URLs.** No `blob:` previews left in the DOM after submitting, and
+  revocation confirmed in the page rather than assumed.
+- **The bidder card.** A lot created through the form with the second photo marked
+  primary renders on the bidder app's card as that photo — the choice made before
+  anything was uploaded is what a bidder sees.
+
+An oversized file cannot reach the upload stage any more: it is refused when the
+file is chosen, which is the point of holding files locally. That is why the
+failure case above had to be forced at the storage layer instead.
 
 ## Outstanding, mark-as-paid and the lot increment — verification (2026-08-13)
 

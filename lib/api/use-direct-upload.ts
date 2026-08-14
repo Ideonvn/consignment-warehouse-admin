@@ -29,6 +29,19 @@ export interface ConfirmArgs {
   index: number;
 }
 
+/**
+ * What happened to one file, returned from `upload` so a caller can act on the
+ * failures rather than scrape them out of `uploads` state — the progress rows
+ * are for the operator to read, and a caller awaiting the batch has a stale
+ * closure over them anyway.
+ */
+export interface UploadOutcome<TResult> {
+  file: File;
+  ok: boolean;
+  result?: TResult;
+  error?: string;
+}
+
 export interface DirectUploadOptions<TResult> {
   presign: (file: File) => Promise<PresignResult>;
   confirm: (args: ConfirmArgs) => Promise<TResult>;
@@ -59,7 +72,10 @@ export function useDirectUpload<TResult>({
     );
   }
 
-  async function uploadOne(file: File, index: number) {
+  async function uploadOne(
+    file: File,
+    index: number,
+  ): Promise<UploadOutcome<TResult>> {
     const id = randomUuid();
     setUploads((prev) => [
       ...prev,
@@ -71,7 +87,7 @@ export function useDirectUpload<TResult>({
     const invalid = validateImageFile(file);
     if (invalid) {
       patch(id, { status: "failed", error: invalid });
-      return;
+      return { file, ok: false, error: invalid };
     }
 
     try {
@@ -99,26 +115,31 @@ export function useDirectUpload<TResult>({
         );
       }
       onUploaded?.(result);
+      return { file, ok: true, result };
     } catch (error) {
       // A storage rejection and an API rejection need different words: the
       // first means the bytes never landed, the second means they did but the
       // API would not record them. Same-looking failure, different next step.
-      patch(id, {
-        status: "failed",
-        error:
-          error instanceof StorageUploadError
-            ? error.message
-            : `The API rejected the upload: ${errorMessage(error)}`,
-      });
+      const message =
+        error instanceof StorageUploadError
+          ? error.message
+          : `The API rejected the upload: ${errorMessage(error)}`;
+      patch(id, { status: "failed", error: message });
+      return { file, ok: false, error: message };
     }
   }
 
   /** Uploads sequentially so progress rows stay readable and ordering holds. */
-  async function upload(files: FileList | File[], startIndex = 0) {
+  async function upload(
+    files: FileList | File[],
+    startIndex = 0,
+  ): Promise<UploadOutcome<TResult>[]> {
     const list = Array.from(files);
+    const outcomes: UploadOutcome<TResult>[] = [];
     for (let i = 0; i < list.length; i += 1) {
-      await uploadOne(list[i], startIndex + i);
+      outcomes.push(await uploadOne(list[i], startIndex + i));
     }
+    return outcomes;
   }
 
   return {

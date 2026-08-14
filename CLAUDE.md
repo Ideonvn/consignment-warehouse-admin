@@ -243,12 +243,34 @@ enforced by the storage policy itself, so an oversized file fails at the storage
 step even if the client-side check is bypassed — that rejection needs different
 wording from an API validation error, because one means the bytes never landed.
 
-That whole sequence is `useDirectUpload` (`lib/api/use-direct-upload.ts`), shared
-by the lot gallery and the auction cover image, sitting on the transport rules in
-`lib/api/upload.ts`. It owns the validate → presign → upload → confirm state
-machine, per-file progress, and the storage-vs-API error wording. A third
-uploader calls the hook with different presign/confirm callbacks — do not copy
-the sequence, it is exactly the kind of thing that drifts.
+That whole sequence is `useDirectUpload` (`lib/api/use-direct-upload.ts`), sitting
+on the transport rules in `lib/api/upload.ts`. It owns the validate → presign →
+upload → confirm state machine, per-file progress, and the storage-vs-API error
+wording. **Three callers now share it** — the lot gallery
+(`components/lots/LotImages.tsx`), the auction cover image
+(`components/auctions/AuctionImage.tsx`) and the lot create form
+(`components/lots/LotCreateForm.tsx`) — each passing its own presign/confirm
+callbacks. A fourth should do the same: do not copy the sequence, it is exactly
+the kind of thing that drifts.
+
+`upload()` returns a per-file outcome so a caller can act on the failures. The
+create form needs that; the other two only render the progress rows.
+
+**Both create forms collect images before the thing they belong to exists.**
+Presign is scoped to a lot or an auction, so nothing can be uploaded until one
+has been created. Lots and auctions therefore hold files locally — object URLs
+for preview, order and primary chosen up front — and attach them immediately
+after creation. Two rules follow, and they are the whole point:
+
+- **A failed image never discards the created record.** The lot or auction is
+  kept and said to exist; the photos that failed are reported with the
+  storage-vs-API distinction and offered a retry in place, plus a link to the
+  screen where the gallery already works. The operator has typed a title,
+  description and prices — losing that over one photograph would be indefensible.
+- **Revoke object URLs.** The lot form stays open for the next lot, so every
+  discard path revokes: successful attach, removed thumbnail, cleared form,
+  unmount. Twenty lots of held previews is a real leak, and photos surviving a
+  reset would attach lot 7's pictures to lot 8.
 
 ## Theming
 

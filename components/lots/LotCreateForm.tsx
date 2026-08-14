@@ -3,7 +3,7 @@
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
@@ -13,13 +13,20 @@ import { MoneyInput } from "@/components/ui/MoneyInput";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { createLot } from "@/lib/api/endpoints";
+import { UploadProgress } from "@/components/ui/UploadProgress";
+import { confirmLotImage, createLot, presignLotImage } from "@/lib/api/endpoints";
 import { errorMessage, isApiError } from "@/lib/api/errors";
 import { useAuction, useAuctionInvalidation } from "@/lib/api/queries";
+import { useDirectUpload } from "@/lib/api/use-direct-upload";
 import { formatMoney } from "@/lib/format/money";
 import { useSetAuctionContext } from "@/lib/ui/auction-context";
 import { usePageTitle } from "@/lib/ui/use-page-title";
 import type { LotAdminSummary } from "@/types/api";
+import {
+  PendingImages,
+  revokePendingImages,
+  type PendingImage,
+} from "./PendingImages";
 
 interface Draft {
   title: string;
@@ -30,6 +37,12 @@ interface Draft {
   incrementMinor: number | null;
   autoLotNumber: boolean;
   lotNumber: string;
+}
+
+/** A created lot whose photos did not all attach, held for a retry. */
+interface Stranded {
+  lot: LotAdminSummary;
+  images: PendingImage[];
 }
 
 const EMPTY: Draft = {
@@ -55,16 +68,79 @@ export function LotCreateForm({ auctionId }: { auctionId: string }) {
   usePageTitle("Add lots");
 
   const [draft, setDraft] = useState<Draft>(EMPTY);
+  const [images, setImages] = useState<PendingImage[]>([]);
   const [added, setAdded] = useState<LotAdminSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [stranded, setStranded] = useState<Stranded | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
   const auction = auctionQuery.data;
   const currency = auction?.currency_code ?? "ZAR";
 
+  /**
+   * Which lot the uploader is currently attaching to.
+   *
+   * The hook's presign and confirm closures are created once, but the lot they
+   * target does not exist until the moment of submit — and changes again on
+   * retry. A ref is the honest way to say "whatever lot we are on now".
+   */
+  const targetLotId = useRef<string | null>(null);
+  const primaryIndex = useRef<number | null>(null);
+
+  const { uploads, upload, clear: clearUploads } = useDirectUpload({
+    presign: (file) =>
+      presignLotImage(targetLotId.current!, {
+        content_type: file.type,
+        size_bytes: file.size,
+      }),
+    confirm: ({ presign, dimensions, index }) =>
+      confirmLotImage(targetLotId.current!, {
+        storage_key: presign.storage_key,
+        width: dimensions?.width ?? null,
+        height: dimensions?.height ?? null,
+        // Position and primary are applied as each photo is confirmed rather
+        // than patched afterwards: the order was decided before upload, so
+        // there is nothing to discover and nothing to correct.
+        is_primary: index === primaryIndex.current,
+        position: index,
+      }),
+  });
+
+  // Previews outlive React state only if nobody revokes them. Every deliberate
+  // discard revokes as it goes; this catches the operator navigating away
+  // mid-session with photos still held.
+  const liveImages = useRef<PendingImage[]>([]);
+  useEffect(() => {
+    liveImages.current = [...images, ...(stranded?.images ?? [])];
+  });
+  useEffect(() => () => revokePendingImages(liveImages.current), []);
+
+  function resetImages() {
+    revokePendingImages(images);
+    setImages([]);
+  }
+
+  /**
+   * Attach held photos to a lot that now exists.
+   *
+   * Sequential and in array order, so `position` matches what the operator
+   * arranged. Whatever fails comes back so the caller can keep those files
+   * rather than lose them with the form reset.
+   */
+  async function attach(lot: LotAdminSummary, files: PendingImage[]) {
+    targetLotId.current = lot.id;
+    const flagged = files.findIndex((image) => image.isPrimary);
+    // Nothing flagged means the first photo, the same rule the gallery and the
+    // bidder app apply.
+    primaryIndex.current = flagged >= 0 ? flagged : 0;
+
+    const outcomes = await upload(files.map((image) => image.file));
+    return files.filter((_, index) => !outcomes[index]?.ok);
+  }
+
   const create = useMutation({
-    mutationFn: () =>
-      createLot(auctionId, {
+    mutationFn: async () => {
+      const lot = await createLot(auctionId, {
         title: draft.title.trim(),
         description: draft.description.trim() || null,
         starting_price_minor: draft.startingPriceMinor ?? 0,
@@ -75,13 +151,37 @@ export function LotCreateForm({ auctionId }: { auctionId: string }) {
         lot_number: draft.autoLotNumber
           ? null
           : Number.parseInt(draft.lotNumber, 10),
-      }),
-    onSuccess: (lot) => {
+      });
+
+      // The lot exists from here on. An image failure is reported and the files
+      // are kept for another go — it never costs the operator the record they
+      // just typed.
+      const failed = images.length > 0 ? await attach(lot, images) : [];
+      return { lot, failed };
+    },
+    onSuccess: ({ lot, failed }) => {
       invalidate(auctionId);
       setAdded((prev) => [lot, ...prev]);
+
+      // Only the photos that landed are revoked; the rest move to the stranded
+      // panel with their previews intact so they can be retried.
+      revokePendingImages(images.filter((image) => !failed.includes(image)));
+      setImages([]);
       setDraft(EMPTY);
       setError(null);
-      toast.success(`Lot ${lot.lot_number ?? ""} "${lot.title}" added`);
+
+      if (failed.length > 0) {
+        setStranded({ lot, images: failed });
+        toast.warning(
+          `Lot ${lot.lot_number ?? ""} "${lot.title}" was created, but ${failed.length} photo${
+            failed.length === 1 ? "" : "s"
+          } did not attach.`,
+        );
+      } else {
+        setStranded(null);
+        clearUploads();
+        toast.success(`Lot ${lot.lot_number ?? ""} "${lot.title}" added`);
+      }
       titleRef.current?.focus();
     },
     onError: (err) => {
@@ -93,6 +193,25 @@ export function LotCreateForm({ auctionId }: { auctionId: string }) {
         setError(errorMessage(err));
       }
     },
+  });
+
+  const retry = useMutation({
+    mutationFn: async (batch: Stranded) => attach(batch.lot, batch.images),
+    onSuccess: (failed, batch) => {
+      invalidate(auctionId);
+      revokePendingImages(batch.images.filter((image) => !failed.includes(image)));
+      if (failed.length > 0) {
+        setStranded({ ...batch, images: failed });
+        toast.warning(
+          `${failed.length} photo${failed.length === 1 ? "" : "s"} still did not attach.`,
+        );
+      } else {
+        setStranded(null);
+        clearUploads();
+        toast.success("Photos attached.");
+      }
+    },
+    onError: (err) => toast.error(errorMessage(err)),
   });
 
   function validate(): string | null {
@@ -279,6 +398,16 @@ export function LotCreateForm({ auctionId }: { auctionId: string }) {
                 )}
               </fieldset>
 
+              <PendingImages
+                images={images}
+                onChange={setImages}
+                disabled={create.isPending}
+              />
+
+              {create.isPending && images.length > 0 && (
+                <UploadProgress uploads={uploads} />
+              )}
+
               {error && (
                 <p
                   role="alert"
@@ -300,6 +429,7 @@ export function LotCreateForm({ auctionId }: { auctionId: string }) {
                   variant="ghost"
                   onClick={() => {
                     setDraft(EMPTY);
+                    resetImages();
                     setError(null);
                     titleRef.current?.focus();
                   }}
@@ -309,11 +439,78 @@ export function LotCreateForm({ auctionId }: { auctionId: string }) {
                 <span className="text-xs text-text-muted">
                   Enter submits. Lots are created as drafts and go live when the
                   auction is published.
+                  {images.length > 0 &&
+                    ` ${images.length} photo${images.length === 1 ? "" : "s"} upload after the lot is created.`}
                 </span>
               </div>
             </div>
           </Panel>
         </form>
+
+        <div className="flex flex-col gap-4">
+          {stranded && (
+            <Panel
+              title="Photos did not attach"
+              description={`Lot ${stranded.lot.lot_number ?? ""} was created — only its photos failed.`}
+            >
+              <Note tone="warning" className="mb-3">
+                <strong>
+                  #{stranded.lot.lot_number ?? "—"} {stranded.lot.title}
+                </strong>{" "}
+                exists and is in the list below. {stranded.images.length} photo
+                {stranded.images.length === 1 ? "" : "s"} did not attach:
+              </Note>
+
+              <UploadProgress uploads={uploads} />
+
+              <ul className="mb-3 flex flex-wrap gap-2">
+                {stranded.images.map((image) => (
+                  <li key={image.id} className="w-20">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={image.url}
+                      alt=""
+                      className="aspect-square w-full rounded border border-border object-cover"
+                    />
+                    <p className="truncate text-[11px] text-text-muted" title={image.file.name}>
+                      {image.file.name}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  loading={retry.isPending}
+                  onClick={() => retry.mutate(stranded)}
+                >
+                  Try these again
+                </Button>
+                <Link href={`/lots/${stranded.lot.id}`}>
+                  <Button variant="secondary" size="sm">
+                    Open the lot instead
+                  </Button>
+                </Link>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    revokePendingImages(stranded.images);
+                    setStranded(null);
+                    clearUploads();
+                  }}
+                >
+                  Discard these photos
+                </Button>
+              </div>
+              <p className="mt-2 text-xs text-text-muted">
+                The lot keeps everything else you typed. Adding photos on its own
+                page works too — this panel is only here to save you the trip.
+              </p>
+            </Panel>
+          )}
 
         <Panel
           title="Added this session"
@@ -352,11 +549,12 @@ export function LotCreateForm({ auctionId }: { auctionId: string }) {
 
           {added.length > 0 && (
             <Note tone="info" className="mt-3">
-              Photos are added per lot on its own page — open a lot above to
-              upload them.
+              Photos added on the form are already attached. To change them
+              later, open a lot above.
             </Note>
           )}
         </Panel>
+        </div>
       </div>
     </>
   );
