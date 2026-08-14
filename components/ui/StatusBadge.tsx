@@ -2,6 +2,7 @@
 
 import {
   AUCTION_STATUS_META,
+  LOT_PROGRESS_META,
   LOT_STATUS_META,
   USER_ROLE_META,
   USER_STATUS_META,
@@ -10,6 +11,7 @@ import {
 } from "@/lib/format/status";
 import type {
   AuctionStatus,
+  LotProgress,
   LotStatus,
   UserRole,
   UserStatus,
@@ -73,6 +75,26 @@ export function StatusBadge({
         ? LOT_STATUS_META[status as LotStatus]
         : USER_STATUS_META[status as UserStatus];
   if (!meta) return <span className="text-text-muted">{status}</span>;
+  return <Badge meta={meta} className={className} />;
+}
+
+/**
+ * The lot's second status axis, from the same map and the same colours as every
+ * other badge — two colour languages on one row would be worse than none.
+ *
+ * Renders nothing when the progress only repeats what the lot status badge next
+ * to it already says. What is left is exactly the set a bidder cannot see, so a
+ * badge here always means "this one is not on the market".
+ */
+export function LotProgressBadge({
+  progress,
+  className,
+}: {
+  progress: LotProgress;
+  className?: string;
+}) {
+  const meta = LOT_PROGRESS_META[progress];
+  if (!meta || meta.quiet) return null;
   return <Badge meta={meta} className={className} />;
 }
 

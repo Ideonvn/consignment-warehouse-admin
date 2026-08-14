@@ -7,9 +7,14 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Countdown } from "@/components/ui/Countdown";
 import { DataTable, type CwColumnDef } from "@/components/ui/DataTable";
-import { EmptyState, ErrorState, TableSkeleton } from "@/components/ui/Feedback";
+import {
+  EmptyState,
+  ErrorState,
+  Note,
+  TableSkeleton,
+} from "@/components/ui/Feedback";
 import { Input, Select } from "@/components/ui/Input";
-import { StatusBadge } from "@/components/ui/StatusBadge";
+import { LotProgressBadge, StatusBadge } from "@/components/ui/StatusBadge";
 import { errorMessage } from "@/lib/api/errors";
 import { useLots } from "@/lib/api/queries";
 import { formatDateTime } from "@/lib/format/datetime";
@@ -22,6 +27,7 @@ import {
   type LotStatus,
 } from "@/types/api";
 import { LotThumb } from "./LotThumb";
+import { PublishLotDialog } from "./PublishLotDialog";
 
 export function LotsTab({ auction }: { auction: AuctionAdmin }) {
   const router = useRouter();
@@ -29,6 +35,7 @@ export function LotsTab({ auction }: { auction: AuctionAdmin }) {
   const [status, setStatus] = useState<LotStatus | "">("");
   const [search, setSearch] = useState("");
   const [selection, setSelection] = useState<RowSelectionState>({});
+  const [publishing, setPublishing] = useState<LotAdminSummary | null>(null);
 
   const lots = useMemo(() => data ?? [], [data]);
 
@@ -45,6 +52,17 @@ export function LotsTab({ auction }: { auction: AuctionAdmin }) {
   }, [lots, status, search]);
 
   const currency = auction.currency_code;
+
+  // Counted over the whole auction, not the filtered rows: a lot bidders cannot
+  // see is worth knowing about even while looking at a filtered view.
+  const needsPublish = useMemo(
+    () => lots.filter((lot) => lot.progress === "needs_publish"),
+    [lots],
+  );
+  const abandoned = useMemo(
+    () => lots.filter((lot) => lot.progress === "abandoned"),
+    [lots],
+  );
 
   const columns: CwColumnDef<LotAdminSummary>[] = useMemo(
     () => [
@@ -92,9 +110,15 @@ export function LotsTab({ auction }: { auction: AuctionAdmin }) {
         header: "Status",
         accessorFn: (row) => row.status,
         sortFn: "text",
-        meta: { width: "10rem" },
+        meta: { width: "13rem" },
         cell: ({ row }) => (
-          <StatusBadge status={row.original.status} kind="lot" />
+          // Two axes, one colour language. The progress badge only appears when
+          // it says something the status badge does not — which is exactly when
+          // bidders cannot see the lot.
+          <div className="flex flex-wrap items-center gap-1">
+            <StatusBadge status={row.original.status} kind="lot" />
+            <LotProgressBadge progress={row.original.progress} />
+          </div>
         ),
       },
       {
@@ -190,6 +214,28 @@ export function LotsTab({ auction }: { auction: AuctionAdmin }) {
           );
         },
       },
+      {
+        id: "publish",
+        header: "",
+        enableSorting: false,
+        meta: { width: "6rem", align: "right" },
+        cell: ({ row }) =>
+          // Listing stock into a running auction is repetitive, so the action is
+          // on the row: opening each lot to publish it would be the same round
+          // trip the create form was just fixed to avoid.
+          row.original.progress === "needs_publish" ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={(event) => {
+                event.stopPropagation();
+                setPublishing(row.original);
+              }}
+            >
+              Publish
+            </Button>
+          ) : null,
+      },
     ],
     [currency],
   );
@@ -207,6 +253,23 @@ export function LotsTab({ auction }: { auction: AuctionAdmin }) {
 
   return (
     <div className="flex flex-col gap-3">
+      {needsPublish.length > 0 && (
+        <Note tone="warning">
+          {needsPublish.length} lot{needsPublish.length === 1 ? "" : "s"} in this
+          auction {needsPublish.length === 1 ? "is" : "are"} still a draft, so
+          bidders cannot see {needsPublish.length === 1 ? "it" : "them"}. The
+          auction was already published, which is what leaves a lot behind —
+          publish {needsPublish.length === 1 ? "it" : "them"} from the rows below.
+        </Note>
+      )}
+      {abandoned.length > 0 && (
+        <Note tone="danger">
+          {abandoned.length} lot{abandoned.length === 1 ? "" : "s"} never opened
+          before this auction finished and can no longer be published. Relist{" "}
+          {abandoned.length === 1 ? "it" : "them"} in another auction.
+        </Note>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <Input
           type="search"
@@ -311,6 +374,13 @@ export function LotsTab({ auction }: { auction: AuctionAdmin }) {
           }
         />
       )}
+
+      <PublishLotDialog
+        lot={publishing}
+        auctionStatus={auction.status}
+        currency={currency}
+        onClose={() => setPublishing(null)}
+      />
     </div>
   );
 }

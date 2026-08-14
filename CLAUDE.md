@@ -256,6 +256,32 @@ the kind of thing that drifts.
 `upload()` returns a per-file outcome so a caller can act on the failures. The
 create form needs that; the other two only render the progress rows.
 
+**A lot has two status axes, and `progress` is the one that says whether bidders
+can see it.** `status` is the lot's own state; `progress` (`live`,
+`waiting_for_worker`, `waiting_for_auction_publish`, `needs_publish`,
+`abandoned`, `terminal`) is what will move it next, and it is the only thing that
+tells the three quite different `draft` cases apart. Both come from the API —
+never re-derive either from the auction's status.
+
+`LotProgressBadge` renders **nothing** when the progress only repeats the status
+badge beside it: `live` next to "Live" is noise, and so is `terminal` next to
+"Sold". What survives that rule is exactly the set a bidder cannot see, so a
+progress badge on a row always means "this one is not on the market". It uses the
+same map and the same tones as `StatusBadge`, because two colour languages on one
+row would be worse than none.
+
+**A lot added to an already-published auction is stranded until someone publishes
+it.** The worker only opens `scheduled` lots and an auction that is not `draft`
+cannot be published again, so `needs_publish` is a real state an operator must
+resolve with `POST /admin/lots/{id}/publish` — from the lots table without
+opening each one, since listing stock is repetitive. It is a confirmation and not
+a one-click action for one reason, which the dialog states: publishing exposes
+the lot, and the first bid freezes its starting price and reserve. `abandoned`
+(a draft lot whose auction has finished) can never open, so it is shown as dead
+and **never offered publish** — relisting is the way out. There is deliberately
+no bulk publish: the backend has no bulk endpoint and looping single calls is
+exactly what the lots toolbar already says it will not do.
+
 **Both create forms collect images before the thing they belong to exists.**
 Presign is scoped to a lot or an auction, so nothing can be uploaded until one
 has been created. Lots and auctions therefore hold files locally — object URLs
@@ -427,7 +453,8 @@ Deliberate, with reasons — see `NOTES.md` for the full list.
 
 - **Bulk lot actions.** The lots table has multi-select wired up and the toolbar
   says plainly that the backend has no bulk endpoints yet. The UI is ready; do
-  not fake it by looping single calls client-side.
+  not fake it by looping single calls client-side. This includes publishing:
+  publish is per-row, however many lots need it.
 - **Bid history paging.** `GET /lots/{id}/bids` is cursor-based and the client
   reads `X-Next-Cursor` / `X-Has-More`, but the lot screen loads only the first
   50 and says so. Nothing in the operator's day has needed deeper history.

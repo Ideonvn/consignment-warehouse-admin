@@ -2,7 +2,13 @@
  * One place that maps every auction and lot status to a label and a tone.
  * StatusBadge is the only consumer; nothing else invents its own colours.
  */
-import type { AuctionStatus, LotStatus, UserRole, UserStatus } from "@/types/api";
+import type {
+  AuctionStatus,
+  LotProgress,
+  LotStatus,
+  UserRole,
+  UserStatus,
+} from "@/types/api";
 
 export type Tone =
   | "neutral"
@@ -75,6 +81,34 @@ export const USER_ROLE_META: Record<UserRole, StatusMeta> = {
   bidder: { label: "Bidder", tone: "neutral" },
   admin: { label: "Admin", tone: "info" },
   superadmin: { label: "Superadmin", tone: "accent" },
+};
+
+/**
+ * The second status axis: what will move this lot next.
+ *
+ * `quiet` means the lot status badge beside it already says this — a `live` lot
+ * reading "Live · Live" is noise. The three loud ones are exactly the three a
+ * bidder cannot see, which is what an operator scanning a list needs to spot.
+ */
+export const LOT_PROGRESS_META: Record<LotProgress, StatusMeta & { quiet?: boolean }> = {
+  live: { label: "Live", tone: "success", quiet: true },
+  waiting_for_worker: { label: "Opens on its own", tone: "info", quiet: true },
+  waiting_for_auction_publish: {
+    label: "Publish the auction",
+    tone: "neutral",
+    hint: "A draft lot in a draft auction. Publishing the auction takes it along — there is nothing to do on the lot itself.",
+  },
+  needs_publish: {
+    label: "Needs publishing",
+    tone: "warning",
+    hint: "The auction is already out, so this lot was left behind as a draft. Bidders cannot see it until you publish it.",
+  },
+  abandoned: {
+    label: "Missed the auction",
+    tone: "danger",
+    hint: "A draft lot in an auction that has finished. It can never open — relist it in another auction.",
+  },
+  terminal: { label: "Finished", tone: "neutral", quiet: true },
 };
 
 export const BID_STATUS_LABEL: Record<string, string> = {

@@ -94,6 +94,33 @@ becomes, and warns when the amount exceeds the debt, because that leaves someone
 in credit rather than settled. Partial payments are the normal case, not an edge
 case: the row stays on the list with a smaller figure.
 
+**The progress badge is suppressed when it repeats the status badge.** Rendering
+both axes on every row would put "Live · Live" and "Sold · Finished" on most of
+the table, and a badge that is always there is a badge nobody reads. It renders
+only for `needs_publish`, `abandoned` and `waiting_for_auction_publish` — which,
+not by coincidence, is exactly the set where `is_visible_to_bidders` is false. So
+the rule an operator learns is a simple one: a second badge means bidders cannot
+see that lot. The detail screen follows the same rule rather than making an
+exception for itself; it explains the three invisible cases in a note instead,
+where there is room for the reason and the way out.
+
+**Publishing a lot is a confirmation, not a row button that just fires.** The
+freeze is why: publishing exposes the lot, and the first bid freezes its starting
+price and reserve, so an operator who publishes a half-entered lot cannot correct
+the money afterwards. The dialog shows both figures and says that plainly. It
+does adapt to where the auction is — "becomes biddable immediately" in a live
+auction, "opens with it" in a scheduled one — because those are materially
+different acts.
+
+**The stranded and abandoned counts are computed over the whole auction, not the
+filtered rows.** A lot bidders cannot see is worth knowing about even while
+looking at a filtered view, and a warning that disappears because of a search box
+is worse than no warning.
+
+**No bulk publish, deliberately.** The lots table has multi-select and the
+backend has no bulk endpoint; looping single calls client-side is the thing the
+toolbar already tells the operator it will not do.
+
 **Lot photos are held on the create form and attached after creation.** Listing
 twenty items used to be forty round trips: create the lot, open it, upload, go
 back. The auction create form had already solved this, so the lot form now does
@@ -468,6 +495,28 @@ through this run (20:17 UTC), which wiped the fixtures and killed the browser
 session — the same cause identified for the earlier "unknown refresh token"
 deaths. Every result above was either observed before that point or re-run
 after it against the new seed.
+
+## Per-lot publish and `progress` — verification (2026-08-14)
+
+- **Live auction.** A lot created in one reported `needs_publish` and
+  `is_visible_to_bidders: false`, showed "Draft · Needs publishing" with a
+  Publish button on the row and a banner above the table. Publishing took it to
+  `status: live`, `progress: live`, `visible: true`; the badge, button and banner
+  all cleared, and the lot then appeared in the bidder app's stack.
+- **Scheduled auction.** Same starting state; the dialog said "joins the auction
+  and opens with it" rather than "immediately", and publishing gave
+  `status: scheduled`, `progress: waiting_for_worker`, visible to bidders.
+- **Draft auction.** Its draft lots read "Draft · Publish the auction", with no
+  row button, no banner and nothing to do on the lot itself.
+- **Abandoned.** A draft lot created in a finished auction read "Draft · Missed
+  the auction" with its own red banner, and publish was offered nowhere — the
+  only "Publish this lot" string in the DOM was the closed dialog's own confirm
+  button, checked for visibility rather than assumed.
+- **Detail screen.** Both the note and the header badge behaved for
+  `needs_publish`, and publishing from there updated in place.
+
+This is the gap the previous round hit and could only report: a lot added to a
+running auction stayed invisible with nothing on screen to say so.
 
 ## Photos on the lot create form — verification (2026-08-14)
 

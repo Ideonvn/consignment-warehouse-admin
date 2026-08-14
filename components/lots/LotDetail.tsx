@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
+import { Button } from "@/components/ui/Button";
 import { Countdown } from "@/components/ui/Countdown";
 import { ErrorState, Note, Skeleton } from "@/components/ui/Feedback";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DataPoint, Panel } from "@/components/ui/Panel";
-import { StatusBadge } from "@/components/ui/StatusBadge";
+import { LotProgressBadge, StatusBadge } from "@/components/ui/StatusBadge";
 import { errorMessage } from "@/lib/api/errors";
 import { useAuction, useLot } from "@/lib/api/queries";
 import { formatDateTime } from "@/lib/format/datetime";
@@ -16,8 +18,10 @@ import { BidHistory } from "./BidHistory";
 import { LotActions } from "./LotActions";
 import { LotEditForm } from "./LotEditForm";
 import { LotImages } from "./LotImages";
+import { PublishLotDialog } from "./PublishLotDialog";
 
 export function LotDetail({ lotId }: { lotId: string }) {
+  const [publishing, setPublishing] = useState(false);
   const lotQuery = useLot(lotId);
   const lot = lotQuery.data;
   const auctionQuery = useAuction(lot?.auction_id);
@@ -69,10 +73,56 @@ export function LotDetail({ lotId }: { lotId: string }) {
             </span>
             {lot.title}
             <StatusBadge status={lot.status} kind="lot" />
+            {/* Same rule as the lists: it appears only when it says something
+                the status badge does not. "Live · Live" reads as a glitch. */}
+            <LotProgressBadge progress={lot.progress} />
           </span>
         }
         actions={<LotActions lot={lot} currency={currency} />}
       />
+
+      {lot.progress === "needs_publish" && (
+        <Note tone="warning" className="mb-3">
+          <p className="font-semibold">Bidders cannot see this lot.</p>
+          <p className="mt-1">
+            It is still a draft in an auction that has already been published,
+            which is what happens to stock added after the auction went out.
+            Publishing it puts it on the market
+            {auctionQuery.data?.status === "live"
+              ? " immediately"
+              : " when the auction opens"}
+            , and freezes its starting price and reserve against the first bid.
+          </p>
+          <p className="mt-2">
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => setPublishing(true)}
+            >
+              Publish this lot
+            </Button>
+          </p>
+        </Note>
+      )}
+
+      {lot.progress === "abandoned" && (
+        <Note tone="danger" className="mb-3">
+          <p className="font-semibold">This lot never opened.</p>
+          <p className="mt-1">
+            It was still a draft when its auction finished, so it can no longer
+            be published and no bidder ever saw it. Relist it in another auction
+            to sell the item.
+          </p>
+        </Note>
+      )}
+
+      {lot.progress === "waiting_for_auction_publish" && (
+        <Note tone="info" className="mb-3">
+          Bidders cannot see this lot yet. It goes out with the auction —
+          publishing the auction takes its draft lots along, so there is nothing
+          to do on the lot itself.
+        </Note>
+      )}
 
       {lot.relisted_from_lot_id && (
         <Note tone="info" className="mb-3">
@@ -212,6 +262,13 @@ export function LotDetail({ lotId }: { lotId: string }) {
           </Panel>
         </div>
       </div>
+
+      <PublishLotDialog
+        lot={publishing ? lot : null}
+        auctionStatus={auctionQuery.data?.status}
+        currency={currency}
+        onClose={() => setPublishing(false)}
+      />
     </>
   );
 }

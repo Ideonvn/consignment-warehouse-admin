@@ -280,6 +280,20 @@ export function withdrawLot(
   });
 }
 
+/**
+ * Bring one draft lot to market in an auction that is already out.
+ *
+ * Only reachable for `progress === "needs_publish"`. It goes straight to `live`
+ * in a live auction and to `scheduled` in a scheduled one; anything else is
+ * refused with a structured error rather than silently doing nothing.
+ */
+export function publishLot(lotId: string): Promise<LotAdminSummary> {
+  return apiRequest(`/admin/lots/${lotId}/publish`, {
+    method: "POST",
+    schema: lotAdminSummarySchema,
+  });
+}
+
 export function deleteLot(lotId: string): Promise<void> {
   return apiRequestVoid(`/admin/lots/${lotId}`, { method: "DELETE" });
 }

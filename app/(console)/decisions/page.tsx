@@ -14,6 +14,7 @@ import {
   TableSkeleton,
 } from "@/components/ui/Feedback";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { LotProgressBadge } from "@/components/ui/StatusBadge";
 import { acceptReserve } from "@/lib/api/endpoints";
 import { errorMessage } from "@/lib/api/errors";
 import {
@@ -163,6 +164,10 @@ export default function DecisionsPage() {
                         {lot.current_leader_handle ?? (
                           <span className="text-text-muted">—</span>
                         )}
+                        {/* Every lot in this queue has ended, so this is quiet
+                            in practice — it is here so a broadened query can
+                            never surface a lot without saying where it stands. */}
+                        <LotProgressBadge progress={lot.progress} className="ml-1.5" />
                       </td>
                       <td className="tnum px-2.5 py-1.5 text-xs text-text-muted">
                         {formatDateTime(lot.effective_ends_at)}

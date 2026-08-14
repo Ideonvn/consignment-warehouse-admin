@@ -198,6 +198,22 @@ export type CreateIncrementRuleInput = z.infer<typeof createIncrementRuleSchema>
 
 /* ------------------------------------------------------------------- lots */
 
+/**
+ * What will move this lot next — a second axis alongside its status, and the
+ * only thing that distinguishes the three quite different reasons a lot can be
+ * sitting in `draft`. Total over (auction status × lot status), so there is no
+ * "other" case to guess at.
+ */
+export const lotProgressSchema = z.enum([
+  "live",
+  "waiting_for_worker",
+  "waiting_for_auction_publish",
+  "needs_publish",
+  "abandoned",
+  "terminal",
+]);
+export type LotProgress = z.infer<typeof lotProgressSchema>;
+
 export const lotAdminSummarySchema = z.object({
   id: z.string(),
   auction_id: z.string(),
@@ -218,6 +234,9 @@ export const lotAdminSummarySchema = z.object({
   relisted_from_lot_id: z.string().nullable(),
   primary_image_url: z.string().nullable(),
   current_leader_handle: z.string().nullable(),
+  progress: lotProgressSchema,
+  /** Derived from `progress`, so a screen never re-derives the state machine. */
+  is_visible_to_bidders: z.boolean(),
 });
 export type LotAdminSummary = z.infer<typeof lotAdminSummarySchema>;
 
@@ -263,6 +282,8 @@ export const lotAdminDetailSchema = z.object({
   current_leader_user_id: z.string().nullable(),
   current_leader_handle: z.string().nullable(),
   relisted_from_lot_id: z.string().nullable(),
+  progress: lotProgressSchema,
+  is_visible_to_bidders: z.boolean(),
 });
 export type LotAdminDetail = z.infer<typeof lotAdminDetailSchema>;
 
