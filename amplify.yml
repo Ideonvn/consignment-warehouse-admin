@@ -1,0 +1,42 @@
+# Amplify Hosting build spec.
+#
+# This lives in the repository rather than in Terraform on purpose: a spec in the
+# repo root takes precedence over an app-level one anyway, so defining both would
+# leave two sources of truth with the losing one still looking authoritative in
+# the console. It is reviewed alongside the code it builds.
+#
+# Every command below is a gate. Amplify aborts the build on the first non-zero
+# exit, so a type error or a lint failure never reaches a deploy — which matters
+# here because the React Compiler lint rules catch real bugs in this codebase
+# (`Date.now()` during render, setState in an effect), not just style.
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        # Next.js 16 needs Node 20.9+; the build image's default has been older
+        # than that in the past, and the failure it produces is obscure.
+        - nvm use 22 || nvm install 22
+        - node -v
+        - npm ci --cache .npm --prefer-offline
+    build:
+      commands:
+        # Types first: it is the fastest of the three and the one most likely to
+        # catch a breaking API-shape change, since every response is parsed
+        # against a zod schema whose inferred type is used throughout.
+        - npm run typecheck
+        - npm run lint
+        # NEXT_PUBLIC_* are read from the branch environment variables here and
+        # inlined into the client bundle. They are build-time, not runtime:
+        # changing one in the console requires a redeploy to take effect.
+        - npm run build
+  artifacts:
+    # WEB_COMPUTE: Amplify reads .next and splits it into the static assets it
+    # serves from CloudFront and the server bundle it runs as compute.
+    baseDirectory: .next
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - .next/cache/**/*
+      - .npm/**/*

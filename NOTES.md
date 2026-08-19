@@ -592,3 +592,53 @@ gathered after re-authenticating against the current seed.
 - **The 200-lot subscription cap.** No auction here is that large, so the
   "subscribe to what is visible, poll the rest" path is still untested against a
   real oversized auction.
+
+## Hosting — Amplify, and the SSR round trip (2026-08-19)
+
+**`eu-west-1`, because Amplify Hosting is not in `af-south-1`.** The API cannot
+be sat next to, so the question is only which supported region is closest.
+Ireland: the west-coast cables out of South Africa land in Europe, making Dublin
+a shorter trip from Johannesburg than any US region and about level with
+Frankfurt. It matters less than it looks — assets come off CloudFront edges in
+Johannesburg and Cape Town, and every API and WebSocket call goes browser →
+`af-south-1` without touching Amplify.
+
+**The build spec lives in `amplify.yml`, not in Terraform.** A spec in the repo
+root takes precedence over an app-level one, so setting `build_spec` in the
+module as the reference does would leave two sources of truth with the losing one
+still displayed in the console as though it were in force.
+
+**Branch environment variables, not app-level.** App-level variables are
+inherited by every branch including previews, which is how a preview build ends
+up pointed at the production API. `enable_auto_branch_creation` is off for the
+same reason: a preview of an unreviewed branch is a working operator console
+against real money.
+
+**The IAM role got smaller than the reference's.** That one attaches
+`AdministratorAccess-Amplify` and grants `amplify:*` on `*`. The server side of
+this app renders shells and holds no AWS credentials — everything an operator
+does goes through the API with a bearer token — so the role needs to write its
+own logs and nothing else, scoped to `/aws/amplify/*`.
+
+### The dynamic routes are server-rendered, and it buys nothing
+
+Five routes are `ƒ` in the build output: the three `[id]` screens plus the
+auction's `lots/new` and `monitor`. They are dynamic because the ids are
+unbounded, so there is no `generateStaticParams` to write.
+
+Measured against the production build rather than assumed: `/lots/{id}` returns
+14.6 kB where a static route returns 14.0 kB, with nine skeleton placeholders,
+**no lot data**, and "Consignment Warehouse — Admin" as its only visible text.
+These pages are thin server shells that await `params` and hand off to a client
+component which fetches with an in-memory bearer token — the server could not
+render the data even if it wanted to.
+
+So each hard load pays a round trip to Ireland (~150–170 ms from Johannesburg)
+plus a compute invocation to receive a skeleton, which the client then discards
+when its own `af-south-1` request lands. Client-side navigation never touches the
+origin and is unaffected.
+
+Making the shells static is worth doing and is not free: the id has to come from
+the client rather than from `params`, which changes the shape of five route
+files. That is a routing change, so it is reported and not taken — the brief was
+explicit about not chasing it unannounced.
