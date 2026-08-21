@@ -31,7 +31,7 @@ variable "app_name" {
 }
 
 variable "repository_url" {
-  description = "Repository Amplify builds from, e.g. https://github.com/your-org/consignment-warehouse-admin."
+  description = "Repository Amplify builds from, e.g. https://github.com/Ideonvn/consignment-warehouse-admin."
   type        = string
 }
 
@@ -50,8 +50,9 @@ variable "branch_name" {
 
 variable "app_domain" {
   description = <<-DESC
-    FQDN for the portal, e.g. admin.example.co.za. Whatever this resolves to must
-    be added verbatim to the API's CORS_ALLOWED_ORIGINS, as https://<domain>.
+    FQDN for the portal: admin.consignment-warehouse.com. Whatever this resolves
+    to must appear verbatim in the API's CORS_ALLOWED_ORIGINS as https://<domain>,
+    which for this value it already does.
   DESC
   type        = string
   default     = ""
@@ -59,17 +60,18 @@ variable "app_domain" {
 
 variable "api_base_url" {
   description = <<-DESC
-    Production REST base, no trailing slash, e.g. https://api.example.co.za/api/v1.
-    Inlined into the client bundle at build time.
+    Production REST base, no trailing slash:
+    https://api.consignment-warehouse.com/api/v1. Inlined into the client bundle
+    at build time.
   DESC
   type        = string
 }
 
 variable "ws_url" {
   description = <<-DESC
-    Production WebSocket endpoint, e.g. wss://api.example.co.za/api/v1/ws. Same
-    host as the API — `wss`, not `ws`: a plain-ws connection from an https page
-    is blocked as mixed content.
+    Production WebSocket endpoint: wss://api.consignment-warehouse.com/api/v1/ws.
+    Same host as the API — `wss`, not `ws`: a plain-ws connection from an https
+    page is blocked as mixed content.
   DESC
   type        = string
 

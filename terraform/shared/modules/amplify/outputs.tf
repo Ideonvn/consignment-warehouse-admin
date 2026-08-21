@@ -29,8 +29,19 @@ output "iam_role_arn" {
 
 output "domain_certificate_records" {
   description = <<-DESC
-    DNS records to create by hand when the zone is not managed in this account.
-    Empty when no custom domain is configured.
+    INFORMATIONAL — not a to-do list. The certificate verification record Amplify
+    is using.
+
+    The hosted zone for this domain is in the same AWS account as the app, so
+    Amplify creates and manages this record itself, along with the domain
+    records. Nobody needs to create it. It is exposed only for diagnosing a
+    domain association stuck in PENDING_VERIFICATION, where seeing what Amplify
+    expects is useful.
+
+    Do NOT hand-create what this prints, and do not add aws_route53_record
+    resources for it: a duplicate record fights Amplify for control of the zone,
+    and ACM cannot renew the certificate if the verification record it owns is
+    modified. Empty when no custom domain is configured.
   DESC
   value       = var.app_domain != "" ? aws_amplify_domain_association.this[0].certificate_verification_dns_record : null
 }

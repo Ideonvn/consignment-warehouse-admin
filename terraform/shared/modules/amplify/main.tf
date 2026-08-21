@@ -15,10 +15,28 @@ resource "aws_amplify_app" "this" {
 
   iam_service_role_arn = aws_iam_role.amplify.arn
 
+  # Null rather than "" when unset, so the attribute is simply not sent. The
+  # recommended path leaves this empty and connects the repository once in the
+  # console — see terraform/README.md → Connecting the private repository.
   access_token = var.github_access_token != "" ? var.github_access_token : null
 
   enable_auto_branch_creation = var.enable_auto_branch_creation
   enable_branch_auto_build    = var.enable_branch_auto_build
+
+  # There is deliberately NO `lifecycle { ignore_changes = [...] }` here, and it
+  # should not be added:
+  #
+  #   - `access_token` / `oauth_token` cannot drift. The AWS API never returns
+  #     them ("The token is not stored" — provider docs for both attributes), so
+  #     there is nothing for Terraform to compare against and nothing to ignore.
+  #   - `repository` can drift, and that is exactly the drift worth seeing.
+  #     Ignoring it would let the app be repointed at a different repository
+  #     without a plan ever saying so — which on this app means another codebase
+  #     silently deployed to the operators' origin.
+  #
+  # The half-connected app the token-less path can produce is avoided by
+  # sequencing, not by hiding the attribute: connect in the console, then
+  # import. See terraform/README.md.
 
   # SPA-style rewrites are deliberately absent: App Router handles its own
   # routing, and a catch-all rewrite here would shadow the compute routes.
@@ -37,9 +55,18 @@ resource "aws_amplify_branch" "main" {
   environment_variables = var.branch_environment_variables
 }
 
-# Custom domain. Amplify issues and renews the certificate itself; what it cannot
-# do is create the DNS records when the zone lives in another account or
-# registrar. See README.md → DNS for the records to add by hand in that case.
+# Custom domain.
+#
+# The hosted zone for consignment-warehouse.com is a Route 53 zone in this same
+# AWS account, so Amplify does the DNS itself: it creates the certificate
+# verification record and the domain records, and renews the certificate. There
+# is nothing to paste anywhere, and deliberately no aws_route53_record here —
+# two things managing the same record set is how a domain ends up half-cut-over.
+#
+# (Amplify's own docs bear this out: the Route 53 procedure ends at "Choose Add
+# domain" with no DNS step, while the third-party procedure says "you must
+# update your DNS records with your third-party domain provider" after Amplify
+# "detects that you are not using a Route 53 domain". See terraform/README.md.)
 resource "aws_amplify_domain_association" "this" {
   count = var.app_domain != "" ? 1 : 0
 
@@ -57,8 +84,22 @@ resource "aws_amplify_domain_association" "this" {
 }
 
 locals {
-  # "admin.example.co.za" -> prefix "admin", root "example.co.za". An apex domain
-  # (no prefix) is supported by passing the bare zone: the prefix is then "".
+  # "admin.consignment-warehouse.com" -> prefix "admin", root
+  # "consignment-warehouse.com". Verified with `terraform console` against the
+  # real value rather than reasoned about: 3 parts, prefix "admin", root
+  # "consignment-warehouse.com".
+  #
+  # A bare apex is supported by passing the zone itself: 2 parts means prefix ""
+  # and root unchanged, which is what Amplify wants for an apex association.
+  #
+  # KNOWN LIMIT of the `> 2` test: it counts labels, so it cannot tell a
+  # subdomain from an apex on a multi-level public suffix. "example.co.za" is
+  # also 3 parts and comes out as prefix "example", root "co.za" — a public
+  # suffix nobody can own. It is right for every shape this repo uses
+  # (admin.consignment-warehouse.com, and the apex it will never set here), and
+  # wrong for an apex like "example.co.za" or "example.com.au". Anyone pointing
+  # this at such a domain must split it explicitly instead of extending the
+  # count test, which cannot be made correct without a public-suffix list.
   domain_parts  = var.app_domain != "" ? split(".", var.app_domain) : []
   domain_prefix = length(local.domain_parts) > 2 ? local.domain_parts[0] : ""
   domain_root   = length(local.domain_parts) > 2 ? join(".", slice(local.domain_parts, 1, length(local.domain_parts))) : var.app_domain

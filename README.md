@@ -156,57 +156,28 @@ The distance matters far less than it appears:
 - Only a **hard load of a server-rendered route** crosses regions — see
   [Rendering](#rendering) for what that costs and why it is worth knowing about.
 
-### First apply
+### Applying, DNS, CORS and first sign-in
 
-State is remote, in the same bucket the backend uses. That bucket is a
-chicken-and-egg and is **not** created by this configuration; the backend repo's
-README covers creating it. `use_lockfile = true` is native S3 locking, so there
-is no DynamoDB table.
+All of it lives in **[terraform/README.md](terraform/README.md)**, which is the
+single place for infrastructure detail: the AWS account, the remote-state
+bootstrap, connecting the private repository without putting a token in state,
+why Amplify owns the DNS records rather than a human, the exact production
+origin to allowlist, and the manual promotion that has to happen before anyone
+can sign in.
 
-```bash
-cd terraform/deployment
-cp terraform.tfvars.example terraform.tfvars   # fill in, never commit
-terraform init
-terraform plan
-```
+The short version:
 
-`terraform.tfvars`, `*.tfstate*` and `.terraform/` are ignored;
-`terraform.tfvars.example` and `.terraform.lock.hcl` are committed on purpose —
-the lock file pins provider hashes.
-
-### DNS
-
-Amplify issues and renews the certificate itself. What it cannot do is create
-records in a zone it does not control. **If the Route 53 zone is not managed in
-this account** (it is not today — the backend's Terraform leaves
-`route53_zone_name` empty), the apply will sit at domain verification until the
-records exist. Create them by hand at the registrar:
-
-1. `terraform output domain_certificate_records` — one CNAME proving domain
-   ownership for the certificate.
-2. A CNAME for the subdomain itself, pointing at the Amplify domain shown in the
-   console for that branch.
-
-Until DNS is cut over the app is reachable at the `amplifyapp.com` address in
-`terraform output default_domain`.
-
-### CORS — the exact origin to allowlist
-
-The API's `CORS_ALLOWED_ORIGINS` is matched **literally and never wildcarded**,
-so this origin must be added there verbatim, with no trailing slash:
-
-```
-https://admin.example.co.za
-```
-
-Substitute the real host if `app_domain` differs; `terraform output
-cors_origin_for_api` prints exactly what to paste. It also belongs in
-`cors_allowed_origins` in the backend's Terraform, which is what lets the browser
-upload images straight to S3.
-
-Getting this wrong does not fail loudly: every preflight is rejected with a bare
-400 and no CORS headers, which the browser reports as an indistinguishable
-network error — the same failure mode as the API being down.
+- Origin: `https://admin.consignment-warehouse.com`, in AWS account
+  `982055099067`.
+- The Route 53 hosted zone is in that same account, so **Amplify creates and
+  manages the DNS records itself** — there is nothing to paste into a control
+  panel and no `aws_route53_record` here.
+- `https://admin.consignment-warehouse.com` must appear verbatim in the API's
+  `CORS_ALLOWED_ORIGINS`, which it does. Exact match: a trailing slash or a
+  `www.` prefix fails as a bare 400 with no CORS headers, which the browser
+  reports as a network error.
+- **Nobody can use the portal until the first operator is promoted to
+  `superadmin` in the production database.** There is no bootstrap endpoint.
 
 ### Build
 

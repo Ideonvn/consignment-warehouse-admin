@@ -14,6 +14,21 @@ frontend:
   phases:
     preBuild:
       commands:
+        # Fail before installing anything if either public variable is missing.
+        #
+        # Both are inlined into the client bundle at build time, and lib/ falls
+        # back to http://localhost:8000 when they are unset — deliberately, so
+        # `npm run dev` works without a .env.local. That fallback is right for a
+        # laptop and a trap for a deploy: a build that lost its branch
+        # environment variables would ship a bundle pointed at a developer's own
+        # machine, failing as a network error on every screen and looking
+        # exactly like the API being down.
+        #
+        # `-n` asserts non-empty rather than merely defined. An environment
+        # variable present but blank is the likelier console mistake, and `-v`
+        # or a bare `${VAR+x}` test would wave it through.
+        - 'test -n "$NEXT_PUBLIC_API_BASE_URL" || { echo "amplify.yml guard failed. NEXT_PUBLIC_API_BASE_URL is unset or empty. Set it as a branch environment variable on this branch, then redeploy."; exit 1; }'
+        - 'test -n "$NEXT_PUBLIC_WS_URL" || { echo "amplify.yml guard failed. NEXT_PUBLIC_WS_URL is unset or empty. Set it as a branch environment variable on this branch, then redeploy."; exit 1; }'
         # Next.js 16 needs Node 20.9+; the build image's default has been older
         # than that in the past, and the failure it produces is obscure.
         - nvm use 22 || nvm install 22

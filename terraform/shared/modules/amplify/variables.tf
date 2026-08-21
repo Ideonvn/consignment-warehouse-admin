@@ -4,7 +4,7 @@ variable "app_name" {
 }
 
 variable "repository_url" {
-  description = "Repository to build from, e.g. https://github.com/your-org/consignment-warehouse-admin."
+  description = "Repository to build from, e.g. https://github.com/Ideonvn/consignment-warehouse-admin."
   type        = string
 }
 
@@ -36,7 +36,7 @@ variable "branch_environment_variables" {
 }
 
 variable "app_domain" {
-  description = "FQDN the app is served from, e.g. admin.example.co.za. Empty means the amplifyapp.com default domain only."
+  description = "FQDN the app is served from, e.g. admin.consignment-warehouse.com. Empty means the amplifyapp.com default domain only."
   type        = string
   default     = ""
 }

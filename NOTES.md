@@ -642,3 +642,45 @@ Making the shells static is worth doing and is not free: the id has to come from
 the client rather than from `params`, which changes the shape of five route
 files. That is a routing change, so it is reported and not taken — the brief was
 explicit about not chasing it unannounced.
+
+## Production deployment — domain, DNS and the GitHub connection (2026-08-21)
+
+**Amplify owns the DNS records, so Terraform must not.** The hosted zone for
+`consignment-warehouse.com` is a Route 53 zone in the same AWS account
+(`982055099067`) as the Amplify app, and in that case Amplify creates and manages
+both the certificate verification record and the domain records itself. Checked
+against AWS's own docs rather than assumed: the Route 53 procedure has no DNS
+step at all, the third-party procedure has two CNAMEs to create by hand and
+begins "Amplify detects that you are not using a Route 53 domain", and the
+troubleshooting page splits the same way — a Route 53 domain stuck in Pending
+Verification is a name-server mismatch, never a missing record.
+
+So `domain_certificate_records` was reworded from a to-do list into a diagnostic,
+and there are deliberately no `aws_route53_record` resources. A record managed in
+two places fights for control of the zone, and ACM cannot renew the certificate
+if the verification record it owns is modified.
+
+**No `lifecycle { ignore_changes }` on `aws_amplify_app`.** The provider
+documents exactly two shapes: `repository` with a token, or omit the token and
+import an app connected in the console. The recommendation is the second — a PAT
+in a Terraform variable lands in state, and this project keeps secrets out of
+state. `ignore_changes` would not help either way: the tokens are never returned
+by the AWS API so they cannot drift, and ignoring `repository` would hide the one
+drift worth seeing, an app repointed at a different codebase.
+
+**The domain-splitting `> 2` test is right here and wrong in general.** Proved
+with `terraform console` on the real value: `admin.consignment-warehouse.com`
+gives prefix `admin`, root `consignment-warehouse.com`. A two-part apex gives
+prefix `""` and the domain unchanged, which is what Amplify wants. But it counts
+labels, so an apex on a multi-level public suffix — `example.co.za`, the very
+placeholder this was written against — comes out as prefix `example`, root
+`co.za`, a suffix nobody can own. Left as is and documented in place: it cannot
+be made correct by extending the count test, only by a public-suffix list, and
+this repo will never set such a value.
+
+**Flagged, not fixed: the localhost fallbacks in `lib/api/http.ts` and
+`lib/realtime/socket.ts`.** Both fall back to `http://localhost:8000` when their
+`NEXT_PUBLIC_*` variable is unset. Because those values are inlined at build
+time, a build that lost its Amplify branch variables would ship a production
+bundle pointed at the operator's own machine, failing as a network error on every
+screen. Sensible in development; a silent trap in a deployed build.

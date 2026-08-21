@@ -7,19 +7,16 @@ aws_region  = "eu-west-1"
 environment = "prod"
 
 app_name       = "consignment-warehouse-admin"
-repository_url = "https://github.com/your-org/consignment-warehouse-admin"
+repository_url = "https://github.com/Ideonvn/consignment-warehouse-admin"
 branch_name    = "main"
 
-# Required for a private repository: `repo` and `admin:repo_hook` scopes.
-# Leave empty to connect the repository by hand in the console instead — the
-# token then never enters Terraform state.
-github_access_token = ""
-
-# Leave empty to launch on the amplifyapp.com domain first and cut DNS over
-# later. Whatever this becomes must be added to the API's CORS_ALLOWED_ORIGINS.
-app_domain = "admin.example.co.za"
+# The hosted zone for consignment-warehouse.com is in this same AWS account, so
+# Amplify creates and manages the DNS records itself — nothing to paste into a
+# control panel. Leave empty to launch on the amplifyapp.com domain first.
+# This origin is already in the API's CORS_ALLOWED_ORIGINS; see terraform/README.md.
+app_domain = "admin.consignment-warehouse.com"
 
 # The production API. Note https and wss — the localhost values in .env.example
 # are for development only, and a ws:// socket from an https page is blocked.
-api_base_url = "https://api.example.co.za/api/v1"
-ws_url       = "wss://api.example.co.za/api/v1/ws"
+api_base_url = "https://api.consignment-warehouse.com/api/v1"
+ws_url       = "wss://api.consignment-warehouse.com/api/v1/ws"

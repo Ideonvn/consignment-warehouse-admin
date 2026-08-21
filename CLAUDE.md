@@ -421,6 +421,18 @@ other port every preflight is rejected with a bare 400 and no CORS headers,
 which the browser reports as an opaque network failure — indistinguishable from
 the backend being down, and a genuinely confusing hour if you do not know it.
 
+**The same rule applies in production, at a new address.** The portal is served
+from `https://admin.consignment-warehouse.com` and the API's
+`CORS_ALLOWED_ORIGINS` carries that string and the bidder app's apex, matched
+exactly — never a wildcard, never a prefix. A trailing slash, a `www.` in front
+of `admin.`, or `http` instead of `https` is a different origin and fails
+identically to the wrong port locally. The refresh cookie is `SameSite=Lax` and
+is set on `api.consignment-warehouse.com`; it reaches the portal only because
+`admin.`, the apex and `api.` share the registrable domain
+`consignment-warehouse.com`. Serving this app from anywhere else — an
+`amplifyapp.com` address, a vanity domain — makes that cookie cross-site and the
+session dies on the first reload. See `terraform/README.md`.
+
 The backend must be running: `make dev-all` (API plus the lifecycle worker that
 opens and closes lots — without it nothing ever closes, so the monitor and the
 decisions queue have nothing to show), `make seed`, and MinIO up for images.
