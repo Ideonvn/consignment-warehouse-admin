@@ -28,6 +28,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AuctionActions } from "./AuctionActions";
 import { AuctionEditForm } from "./AuctionEditForm";
 import { AuctionImage } from "./AuctionImage";
+import { AuctionVisibility } from "./AuctionVisibility";
 import { AuctionParticipants } from "./AuctionParticipants";
 import { IncrementRulesEditor } from "./IncrementRulesEditor";
 import { LotsTab } from "@/components/lots/LotsTab";
@@ -176,8 +177,10 @@ export function AuctionDetail({ auctionId }: { auctionId: string }) {
       {tab === "overview" && (
         <div className="flex flex-col gap-4">
           <AuctionEditForm auction={auction} lots={lots} />
-          {/* Outside the edit form on purpose: image_url is not frozen when a
-              lot has a bid, and the form is where the freezing rules live. */}
+          {/* Both of these sit outside the edit form on purpose: neither
+              image_url nor visibility is frozen when a lot has a bid, and the
+              form is where the freezing rules live. */}
+          <AuctionVisibility auction={auction} lots={lots} />
           <AuctionImage auction={auction} />
         </div>
       )}

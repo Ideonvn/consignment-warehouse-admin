@@ -20,3 +20,6 @@ app_domain = "admin.consignment-warehouse.com"
 # are for development only, and a ws:// socket from an https page is blocked.
 api_base_url = "https://api.consignment-warehouse.com/api/v1"
 ws_url       = "wss://api.consignment-warehouse.com/api/v1/ws"
+
+# The bidder app, for share links only. The apex — this portal is on admin.
+bidder_app_url = "https://consignment-warehouse.com"

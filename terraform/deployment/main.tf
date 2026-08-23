@@ -13,6 +13,8 @@ module "admin_portal" {
   branch_environment_variables = {
     NEXT_PUBLIC_API_BASE_URL = var.api_base_url
     NEXT_PUBLIC_WS_URL       = var.ws_url
+    # Link building only — no requests are made to this origin from here.
+    NEXT_PUBLIC_BIDDER_APP_URL = var.bidder_app_url
   }
 
   # Off: a preview build of an unreviewed branch would be a working operator

@@ -684,3 +684,59 @@ this repo will never set such a value.
 time, a build that lost its Amplify branch variables would ship a production
 bundle pointed at the operator's own machine, failing as a network error on every
 screen. Sensible in development; a silent trap in a deployed build.
+
+## Auction visibility — public or private (2026-08-23)
+
+**The control lives outside `AuctionEditForm`, and I agree with the brief's
+reasoning.** That component is built entirely around `freezeReasons` and a
+batched `Draft` dirty-check. Visibility is never frozen, and it is an instant
+decision with a dialog on one side — inside the form it would queue behind
+"Save changes" alongside fields that cannot move. Same case as the cover image,
+so it sits beside it.
+
+**The list marker is a globe, and only on public rows.** Not `StatusBadge`:
+visibility is not a status, and CLAUDE.md makes that map single-purpose. Private
+is the default and the majority, so marking every row would produce a column of
+identical badges nobody reads — the exception is what an operator scans for.
+Measured rather than assumed: the marker is 14×14 inside the existing line box
+and marked rows are 45.5px, identical to unmarked ones, so the row does not
+grow. Contrast on the existing `--text-muted`, no new token: **6.13 light /
+7.30 dark**, against the 3:1 a non-text indicator needs.
+
+**No type-to-confirm and no reason on the make-private dialog — agreed.** Cancel
+and void earn that ceremony by being irreversible and touching money. This is
+one click each way and touches nothing; ceremony out of proportion to risk is
+what teaches operators to type "CANCEL" without reading. The dialog does state
+the two consequences plainly, which is the part that matters.
+
+**Found by testing, not reasoning: public is a second gate, not the only one.**
+A draft auction marked public still 404s anonymously on `/public/auctions/{id}`,
+while an ended one returns 200. My first draft of the panel promised "anyone can
+browse the lots" for any public auction, which would have been a lie on a draft.
+It now says a draft is not on the public site until published.
+
+**Per-lot share link: yes, worth it.** `GET /api/v1/public/lots/{lot_id}` exists
+and returns 200 anonymously, and a single lot is what actually gets posted into a
+group. It is on the lot screen, gated on the parent auction being public, since
+lots inherit visibility and have no flag of their own.
+
+### The share link resolves at the API but not yet in the bidder app
+
+Checked in a genuinely fresh browser context (zero cookies), not by reasoning:
+
+- `GET /api/v1/public/auctions/{id}` → **200**, 20 lots, anonymously. Neither
+  `reserve_price_minor` nor `phone_e164` appears in the payload.
+- `GET /api/v1/public/lots/{id}` → **200** anonymously.
+- `http://localhost:3000/auctions/{id}` in that same fresh context → renders
+  **"Couldn't load this auction — Your session has expired. Please sign in
+  again."** Same for `/lots/{id}`.
+
+The cause is in the bidder repo: `components/layout/AppShell.tsx` wraps the whole
+`(app)` route group in `<AuthGuard>`, which bounces anonymous visitors. So the
+URL shape is right and the backend is ready, but **a link shared today lands an
+anonymous visitor on a session error** until that repo ships anonymous browsing.
+The copy button is still worth having — the base is one constant — but nobody
+should believe the link works for a stranger yet.
+
+**Making it private is verified to do what the dialog claims.** After confirming,
+both the auction and one of its lots returned 404 anonymously.

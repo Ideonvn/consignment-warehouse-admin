@@ -202,6 +202,49 @@ it is shown on the user detail screen because it is what an operator quotes when
 someone asks how to pay. It arrives after the form mounts, so the default is
 reconciled during render and only while the field is untouched.
 
+**Visibility is not a status, and not a frozen field.** `auctions.visibility` is
+`public` or `private`, default private, and it is orthogonal to
+`AuctionStatus` — a `live` auction may be either. Two consequences, both
+load-bearing:
+
+- **It does not go through `StatusBadge`.** That is the single status→colour
+  map; visibility is a different axis, and two meanings sharing one visual
+  language on one row is worse than two languages. The auctions table marks the
+  **public** case only, with a 14px globe inside the existing line box:
+  private is the default and the majority, and a mark on every row is one nobody
+  reads. `PublicMark` in `components/auctions/VisibilityMark.tsx`.
+- **The control sits outside `AuctionEditForm`**, beside the cover image, for
+  exactly the reason the image does: that component is where the freeze rules
+  live, and visibility is never frozen. It stays changeable mid-auction because
+  an operator who published by mistake must be able to unpublish, and it should
+  not queue behind the form's batched "Save changes".
+
+**Lots inherit their auction's visibility — there is no per-lot flag.** Do not
+add one; a second axis would make "can this be seen" the product of two
+settings, and every query and test would have to cover the grid.
+
+**Public is a second gate, not the only one.** A **draft** auction marked public
+still 404s on `/api/v1/public/*`; publishing is a separate gate. An `ended` one
+does return 200. The visibility panel says so for a draft rather than promising
+browsing the API will not deliver.
+
+**Going private on a live auction with bids gets a dialog.** It strands anyone
+browsing anonymously and kills links already shared — a lot posted into a
+WhatsApp group stops opening — and the API cannot explain itself, because a
+private auction is indistinguishable from one that never existed. That dialog
+deliberately has **no type-to-confirm and no reason field**: those belong to
+cancel-auction and void-bid, which are irreversible and touch money. This is
+reversible in one click and touches nothing, and ceremony out of proportion to
+risk teaches operators to click through ceremonies. Going the other way needs no
+dialog at all.
+
+**Links into the bidder app are built in one place**,
+`lib/config/bidder-app.ts`, from `NEXT_PUBLIC_BIDDER_APP_URL`. The bidder app's
+canonical URL shape is still settling in that repository, so if it lands
+differently this is one line rather than a search. The base falls back to
+production, never to localhost: a share link is pasted to someone else, so a
+localhost link is broken rather than merely degraded.
+
 **Participants are a query, not a roster.** `GET /admin/auctions/{id}/participants`
 is computed on read — there is no participant table, no registration and no
 approval step, so **do not build an "approve" control**. Eligibility falls out of

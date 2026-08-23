@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { DateTimeInput } from "@/components/ui/DateTimeInput";
 import { Field } from "@/components/ui/Field";
 import { Note } from "@/components/ui/Feedback";
-import { Input, Textarea } from "@/components/ui/Input";
+import { Input, Select, Textarea } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { Panel } from "@/components/ui/Panel";
@@ -30,7 +30,11 @@ import { formatCountdown } from "@/lib/format/datetime";
 import { slugify } from "@/lib/format/slug";
 import { useNow } from "@/lib/ui/hooks";
 import type { IncrementBand } from "@/lib/format/increments";
-import { ALLOWED_IMAGE_TYPES, AUCTION_SLUG_RE } from "@/types/api";
+import {
+  ALLOWED_IMAGE_TYPES,
+  AUCTION_SLUG_RE,
+  auctionVisibilitySchema,
+} from "@/types/api";
 
 const formSchema = z
   .object({
@@ -55,6 +59,7 @@ const formSchema = z
     anti_snipe_window_seconds: z.number().int().min(0).max(3600),
     anti_snipe_extension_seconds: z.number().int().min(0).max(3600),
     max_extensions: z.number().int().min(0).max(1000),
+    visibility: auctionVisibilitySchema,
     deposit_amount_minor: z.number().int().min(0),
     buyers_premium_bps: z.number().int().min(0).max(10000),
   })
@@ -104,6 +109,9 @@ export default function NewAuctionPage() {
       anti_snipe_window_seconds: 300,
       anti_snipe_extension_seconds: 300,
       max_extensions: 20,
+      // Private by default, matching the backend. A new auction being invisible
+      // until someone decides otherwise is the safe direction to be wrong in.
+      visibility: "private",
       deposit_amount_minor: 0,
       buyers_premium_bps: 0,
     },
@@ -125,6 +133,7 @@ export default function NewAuctionPage() {
         anti_snipe_window_seconds: parsed.anti_snipe_window_seconds,
         anti_snipe_extension_seconds: parsed.anti_snipe_extension_seconds,
         max_extensions: parsed.max_extensions,
+        visibility: parsed.visibility,
         deposit_amount_minor: parsed.deposit_amount_minor,
         buyers_premium_bps: parsed.buyers_premium_bps,
       });
@@ -264,6 +273,17 @@ export default function NewAuctionPage() {
               hint="Shown to bidders on the auction page."
             >
               <Textarea id="description" {...register("description")} />
+            </Field>
+
+            <Field
+              label="Visibility"
+              htmlFor="visibility"
+              hint="Private is the default. A public auction is browsable by anyone with no account at all; bidding still needs one. Changeable at any time afterwards."
+            >
+              <Select id="visibility" {...register("visibility")}>
+                <option value="private">Private — staff only</option>
+                <option value="public">Public — anyone can browse it</option>
+              </Select>
             </Field>
 
             <Field

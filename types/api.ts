@@ -89,6 +89,19 @@ export type UpdateMeInput = z.infer<typeof updateMeSchema>;
 
 /* --------------------------------------------------------------- auctions */
 
+/**
+ * Who may see an auction at all — orthogonal to `auctionStatusSchema`.
+ *
+ * Status is where an auction is in its lifecycle; visibility is whether an
+ * anonymous visitor can reach it. A `live` auction may be either. **Lots
+ * inherit this from their auction and there is no per-lot flag**, deliberately:
+ * a second axis would make "can this be seen" the product of two settings.
+ *
+ * Not a status, so it deliberately does not go through `StatusBadge`.
+ */
+export const auctionVisibilitySchema = z.enum(["public", "private"]);
+export type AuctionVisibility = z.infer<typeof auctionVisibilitySchema>;
+
 export const auctionAdminSchema = z.object({
   id: z.string(),
   slug: z.string(),
@@ -116,6 +129,8 @@ export const auctionAdminSchema = z.object({
   deposit_amount_minor: z.number(),
   /** Basis points: 1500 is 15%. Never shown raw to the operator. */
   buyers_premium_bps: z.number(),
+  /** Public means anyone can browse it without an account. Default private. */
+  visibility: auctionVisibilitySchema,
 });
 export type AuctionAdmin = z.infer<typeof auctionAdminSchema>;
 
@@ -155,6 +170,8 @@ export const createAuctionSchema = z.object({
   max_extensions: z.number().int().min(0).optional(),
   deposit_amount_minor: z.number().int().min(0).optional(),
   buyers_premium_bps: z.number().int().min(0).max(10000).optional(),
+  /** Ordinary field on the create payload — no two-phase dance like the image. */
+  visibility: auctionVisibilitySchema.optional(),
 });
 export type CreateAuctionInput = z.infer<typeof createAuctionSchema>;
 
@@ -170,6 +187,8 @@ export const updateAuctionSchema = z.object({
   max_extensions: z.number().int().optional(),
   deposit_amount_minor: z.number().int().min(0).optional(),
   buyers_premium_bps: z.number().int().min(0).max(10000).optional(),
+  /** Never frozen: changeable at any time, including mid-auction. */
+  visibility: auctionVisibilitySchema.optional(),
   confirm_shorten: z.boolean().optional(),
 });
 export type UpdateAuctionInput = z.infer<typeof updateAuctionSchema>;

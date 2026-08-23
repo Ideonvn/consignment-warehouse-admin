@@ -67,6 +67,15 @@ variable "api_base_url" {
   type        = string
 }
 
+variable "bidder_app_url" {
+  description = <<-DESC
+    Base URL of the bidder app, used only to build shareable links to public
+    auctions and lots. No trailing slash. The portal never calls it.
+  DESC
+  type        = string
+  default     = "https://consignment-warehouse.com"
+}
+
 variable "ws_url" {
   description = <<-DESC
     Production WebSocket endpoint: wss://api.consignment-warehouse.com/api/v1/ws.

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Countdown } from "@/components/ui/Countdown";
+import { CopyLinkButton } from "@/components/ui/CopyLinkButton";
 import { ErrorState, Note, Skeleton } from "@/components/ui/Feedback";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DataPoint, Panel } from "@/components/ui/Panel";
@@ -14,6 +15,7 @@ import { formatDateTime } from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
 import { useSetAuctionContext } from "@/lib/ui/auction-context";
 import { usePageTitle } from "@/lib/ui/use-page-title";
+import { publicLotUrl } from "@/lib/config/bidder-app";
 import { BidHistory } from "./BidHistory";
 import { LotActions } from "./LotActions";
 import { LotEditForm } from "./LotEditForm";
@@ -78,7 +80,24 @@ export function LotDetail({ lotId }: { lotId: string }) {
             <LotProgressBadge progress={lot.progress} />
           </span>
         }
-        actions={<LotActions lot={lot} currency={currency} />}
+        actions={
+          <>
+            {/* A single lot is what actually gets posted into a group chat, so
+                the share link is here as well as on the auction. Lots inherit
+                their auction's visibility and have no flag of their own, so
+                this appears only when that auction is public — a link to a lot
+                in a private auction goes nowhere. */}
+            {auctionQuery.data?.visibility === "public" &&
+              lot.is_visible_to_bidders && (
+                <CopyLinkButton
+                  url={publicLotUrl(lot.id)}
+                  label="Copy lot link"
+                  size="md"
+                />
+              )}
+            <LotActions lot={lot} currency={currency} />
+          </>
+        }
       />
 
       {lot.progress === "needs_publish" && (

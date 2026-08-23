@@ -10,6 +10,7 @@ import { EmptyState, ErrorState, TableSkeleton } from "@/components/ui/Feedback"
 import { Input, Select } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { PublicMark } from "@/components/auctions/VisibilityMark";
 import { useAuctions } from "@/lib/api/queries";
 import { errorMessage } from "@/lib/api/errors";
 import { formatDateTime } from "@/lib/format/datetime";
@@ -44,13 +45,23 @@ export default function AuctionsPage() {
         sortFn: "text",
         cell: ({ row }) => (
           <div className="flex min-w-0 flex-col">
-            <Link
-              href={`/auctions/${row.original.id}`}
-              className="truncate font-medium hover:underline"
-              onClick={(event) => event.stopPropagation()}
-            >
-              {row.original.name}
-            </Link>
+            <span className="flex min-w-0 items-center gap-1.5">
+              <Link
+                href={`/auctions/${row.original.id}`}
+                className="truncate font-medium hover:underline"
+                onClick={(event) => event.stopPropagation()}
+              >
+                {row.original.name}
+              </Link>
+              {/* Marker, not a badge — visibility is not a status, so it does
+                  not go through StatusBadge. Only public is marked: private is
+                  the default and the majority, and a mark on every row is one
+                  nobody reads. Sits in the existing line box, so the row keeps
+                  its height. */}
+              {row.original.visibility === "public" && (
+                <PublicMark className="shrink-0 text-text-muted" />
+              )}
+            </span>
             <span className="truncate font-mono text-xs text-text-muted">
               {row.original.slug}
             </span>
