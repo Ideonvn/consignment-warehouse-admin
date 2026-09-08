@@ -9,9 +9,16 @@
  *
  * So this is a marker, not a badge: a globe glyph on the auction's own line,
  * inside the existing line box, adding no height to a 36–40px row. Only the
- * PUBLIC case is marked. Private is the default and the majority, and marking
- * every row would be noise that stops being read — the exception is what an
- * operator scans for.
+ * PUBLIC case is marked — the exception is what an operator scans for, and a
+ * mark on every row is one nobody reads.
+ *
+ * The premise moved and the mark deliberately did not: the backend now defaults
+ * `visibility` to public, so over time PUBLIC becomes the majority and it is
+ * private that will be the exception. Marking the public case anyway is the
+ * safer way round — the mark says "this is reachable by anyone", which is the
+ * fact worth catching on a glance down a list, and an absent mark can never be
+ * read as a false promise of privacy. If the list ever reads as a column of
+ * globes, mark the private case instead; do not mark both.
  */
 export function PublicMark({ className }: { className?: string }) {
   return (

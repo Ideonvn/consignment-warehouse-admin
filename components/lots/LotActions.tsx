@@ -266,7 +266,7 @@ export function RelistDialog({
       <div className="flex flex-col gap-3">
         <Note tone="info">
           The title, description, prices and images are copied. Bids, automatic
-          bids, swipes, extension counts and the current price are not — the new
+          bids, extension counts and the current price are not — the new
           lot starts clean, and links back to this one.
         </Note>
 

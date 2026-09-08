@@ -740,3 +740,127 @@ should believe the link works for a stranger yet.
 
 **Making it private is verified to do what the dialog claims.** After confirming,
 both the auction and one of its lots returned 404 anonymously.
+
+## Simplification round — letterbox, public default, photo cap (2026-09-08)
+
+Three small changes against the backend's own simplification. Nothing was
+redesigned; the lot filter, decisions queue, ledger, statement, participants,
+outstanding, density and palette were not touched.
+
+### Swipes: nothing here depended on them — confirmed by looking
+
+`grep -rni swipe` over `app/`, `components/`, `lib/` and `types/` found exactly
+**one** hit, and it was prose: the relist dialog listed "swipes" among the things
+a relisted lot does not carry over. No query, no schema field, no render path.
+`my_swipe` had already been dropped from `LotAdminOut` in an earlier round
+without a change here (see the second-round note above), which is why there was
+nothing left to find. The word was removed from that sentence so the dialog does
+not name a concept the product no longer has; behaviour is identical.
+
+### Letterbox: which surfaces changed, and which stayed cropped
+
+`object-cover` → `object-contain` on `bg-letterbox`, container dimensions
+untouched in every case:
+
+- **Lot photo gallery** (`components/lots/LotImages.tsx`) — the `aspect-square`
+  grid tile.
+- **Lot create form previews** (`components/lots/PendingImages.tsx`) — the
+  pending thumbnails, same grid shape.
+- **Lot create form stranded panel** (`components/lots/LotCreateForm.tsx`) — the
+  80px thumbnails of photos that failed to attach.
+- **Auction cover image** (`components/auctions/AuctionImage.tsx`) — the fixed
+  96×128 box beside the state description.
+
+**Left cropped on purpose: `LotThumb`, the 32×32 thumbnail in the lots table.**
+It is the only one, and it is an identity cue for scanning a dense table, not a
+surface anyone judges a photograph on — at 32px a contained 3:1 photo is an 11px
+sliver in a 32px box, which is less recognisable than a crop, not more. The
+prompt's own boundary was "any thumbnail large enough for the crop to matter";
+32px is not. If it ever grows, it should change with the rest.
+
+**The auction create form has no preview to letterbox** — it collects a file and
+shows only its name, because presign is scoped to an auction that does not exist
+yet. Nothing to change there; noted so the next reader does not go looking.
+
+### `--letterbox` is the one new token, and identical in both themes
+
+`#000000` in `:root`, no `[data-theme="dark"]` override — deliberately, like the
+`*-fill-ink` tokens. Photographic content reads against black, and an operator
+judging what a bidder will see must not have the frame colour move at dusk.
+
+It is a backdrop for imagery, never text and never a boundary, so WCAG 1.4.11's
+3:1 does not bind. Measured anyway, so the choice is on the record: black against
+`--surface` is **21:1 in light** and **1.23:1 in dark**. The dark figure is the
+point, not a failure — the band is meant to disappear into a dark console — and
+the tile's own `--border` is what draws the box edge in both themes, which is why
+losing the fill contrast costs nothing. Verified visually in both.
+
+`app/globals.css` was touched for this token and nothing else.
+
+### The photo cap
+
+`image_count` and `image_limit` are on `GET /admin/lots/{id}` only, so:
+
+- **The gallery counts from the image list, not from `image_count`.** The list is
+  what the panel renders and what a delete updates; reading the count from a
+  second source would let the number and the thumbnails disagree on screen. The
+  *limit* comes from the lot, because nothing else knows it.
+- **`limit === 0` means "no cap known"** and disables all of it — the schema
+  defaults both fields, so an older backend degrades to the behaviour this screen
+  had before the cap rather than showing "3 of 0".
+- **No counter on the lot create form.** The cap is only exposed per lot, and the
+  lot does not exist yet, so the only ways to show "0 of 20" there are to hardcode
+  20 or to invent an endpoint. Both were rejected. The create path relies on the
+  API refusal, which the stranded-photos panel already reports well — verified
+  below with a real 21-photo lot.
+- **No new `ApiError` kind for the 409.** Its `detail` is an object with a
+  `message`, so `ApiError.fromResponse` already lifts the backend's own sentence,
+  and `useDirectUpload` already prefixes it as an API rejection rather than a
+  storage one. A typed schema would buy `image_count`, which the batch's own
+  refetch supplies along with the thumbnails.
+- **The batch refetches whatever happened**, not only on success: a cap refusal
+  means another device is ahead of this screen, and that is exactly when the
+  counter must catch up.
+
+Selecting more files than there is room for is left to the server. Silently
+trimming the selection would be worse — a per-file failed row names which photo
+was refused and why.
+
+### Verified against the running backend on 3100
+
+Seeded database, `make dev-all`, logged in as the seeded superadmin, both themes.
+
+- **A 2400×800 and an 800×2400 photo uploaded to the same lot.** Both render
+  whole with black bands. Every tile — 4:3, 3:4, 3:1, 1:3 — measured **302×302
+  image box in a 349px row**, identical to the pre-existing photos beside them.
+  The lots-table row height is untouched because `LotThumb` did not change.
+- **Cover image**: the same 3:1 photo in the 128×96 box, `object-fit: contain`
+  on `rgb(0, 0, 0)`, box unchanged.
+- **Counter**: "2 of 20" → "4 of 20" → "19 of 20" → "20 of 20" as photos landed,
+  with "18 more can be added" on the drop zone.
+- **At the cap**: "Add photos" disabled with a reason on hover, the drop zone
+  swapped to the at-limit copy and refusing drops.
+- **The server's refusal, reached honestly rather than forced.** At 19 of 20 two
+  files were selected. The first landed; the second came back
+  *"The API rejected the upload: this lot already has 20 images; delete one
+  before adding another"* — the backend's own sentence, distinct from the
+  storage wording.
+- **The same refusal on the create path**: a new lot submitted with 21 held
+  photos. 20 attached, the 21st was refused with that message, and
+  **the lot was kept** — "Lot 1 was created — only its photos failed" — with the
+  failed photo offered a retry.
+- **A new auction is created public**, the select shows Public first, and it
+  round-trips: the detail screen reads "Public", with the existing note that a
+  draft is still not on the public site until published.
+
+Test data was removed by reseeding afterwards.
+
+### One premise that moved: the globe marker
+
+`PublicMark` justified marking only the public case with "private is the default
+and the majority". With the backend defaulting to public that will invert over
+time. **The marker was deliberately not changed** — it was named as out of scope,
+and marking the public case is the safer way round, since an absent mark can
+never be misread as a promise of privacy. The comment now says so, and says what
+to do if the list ever reads as a column of globes. Worth an operator's opinion
+before anyone acts on it.

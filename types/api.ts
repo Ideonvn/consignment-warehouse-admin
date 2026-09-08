@@ -129,7 +129,7 @@ export const auctionAdminSchema = z.object({
   deposit_amount_minor: z.number(),
   /** Basis points: 1500 is 15%. Never shown raw to the operator. */
   buyers_premium_bps: z.number(),
-  /** Public means anyone can browse it without an account. Default private. */
+  /** Public means anyone can browse it without an account. Defaults to public. */
   visibility: auctionVisibilitySchema,
 });
 export type AuctionAdmin = z.infer<typeof auctionAdminSchema>;
@@ -303,6 +303,15 @@ export const lotAdminDetailSchema = z.object({
   relisted_from_lot_id: z.string().nullable(),
   progress: lotProgressSchema,
   is_visible_to_bidders: z.boolean(),
+  /**
+   * The photo cap, as a pair. `image_count` duplicates `images.length`, but the
+   * LIMIT is not derivable from anything the client holds — without it the
+   * portal can only discover the cap by being refused, which is an error where
+   * a counter would do. Defaulted so an older backend degrades to "no cap
+   * known" rather than failing the parse.
+   */
+  image_count: z.number().default(0),
+  image_limit: z.number().default(0),
 });
 export type LotAdminDetail = z.infer<typeof lotAdminDetailSchema>;
 

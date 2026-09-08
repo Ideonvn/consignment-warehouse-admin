@@ -42,7 +42,18 @@ function TrashIcon() {
   );
 }
 
-export function LotImages({ lotId }: { lotId: string }) {
+export function LotImages({
+  lotId,
+  limit,
+}: {
+  lotId: string;
+  /**
+   * The server's cap, from `GET /admin/lots/{id}`. 0 means the backend did not
+   * send one, in which case nothing is counted or disabled and the API stays
+   * the only authority — the same position this screen was in before the cap.
+   */
+  limit: number;
+}) {
   const client = useQueryClient();
   const { data, isPending } = useLotImages(lotId);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -56,6 +67,13 @@ export function LotImages({ lotId }: { lotId: string }) {
   // lowest position as primary, so the operator sees the same thing here.
   const flaggedPrimary = images.find((image) => image.is_primary);
   const effectivePrimaryId = flaggedPrimary?.id ?? images[0]?.id ?? null;
+
+  // The count comes from the image list, not from the lot's `image_count`: the
+  // list is what this screen renders and what a delete here updates, so the two
+  // numbers beside each other can never disagree. The cap is the lot's, because
+  // nothing else knows it.
+  const capped = limit > 0;
+  const full = capped && images.length >= limit;
 
   function refresh() {
     void client.invalidateQueries({ queryKey: queryKeys.lotImages(lotId) });
@@ -79,7 +97,11 @@ export function LotImages({ lotId }: { lotId: string }) {
   });
 
   function handleFiles(files: FileList | File[]) {
-    void upload(files, images.length);
+    // Refetched after the batch whatever happened, not only per success: a cap
+    // refusal means another operator's photos are already on this lot and our
+    // counter is behind. The refusal carries `image_count`, but re-reading the
+    // list gets the thumbnails with it.
+    void upload(files, images.length).then(refresh);
   }
 
   const makePrimary = useMutation({
@@ -166,9 +188,18 @@ export function LotImages({ lotId }: { lotId: string }) {
   return (
     <Panel
       title="Photos"
-      description={`${images.length} on this lot · the primary one is what bidders see first`}
+      description={
+        capped
+          ? `${images.length} of ${limit} · the primary one is what bidders see first`
+          : `${images.length} on this lot · the primary one is what bidders see first`
+      }
       actions={
-        <Button size="sm" onClick={() => inputRef.current?.click()}>
+        <Button
+          size="sm"
+          disabled={full}
+          title={full ? `This lot is at its limit of ${limit} photos` : undefined}
+          onClick={() => inputRef.current?.click()}
+        >
           Add photos
         </Button>
       }
@@ -194,26 +225,45 @@ export function LotImages({ lotId }: { lotId: string }) {
         onDrop={(event) => {
           event.preventDefault();
           setDragOver(false);
+          if (full) return;
           if (event.dataTransfer.files.length > 0) {
             void handleFiles(event.dataTransfer.files);
           }
         }}
         className={cn(
           "mb-3 rounded border border-dashed px-3 py-4 text-center text-sm",
-          dragOver
-            ? "border-accent bg-info-tint text-accent-strong"
-            : "border-border-strong text-text-muted",
+          full
+            ? "border-border-strong text-text-muted"
+            : dragOver
+              ? "border-accent bg-info-tint text-accent-strong"
+              : "border-border-strong text-text-muted",
         )}
       >
-        Drop photos here, or{" "}
-        <button
-          type="button"
-          className="font-medium text-accent-strong underline"
-          onClick={() => inputRef.current?.click()}
-        >
-          choose files
-        </button>
-        <p className="mt-1 text-xs">JPEG, PNG or WebP · up to 10 MB each</p>
+        {full ? (
+          <>
+            This lot has all {limit} photos it can hold. Delete one to add
+            another.
+            <p className="mt-1 text-xs">
+              The server enforces this too, so a photo added from another device
+              can put the lot at its limit before this screen catches up.
+            </p>
+          </>
+        ) : (
+          <>
+            Drop photos here, or{" "}
+            <button
+              type="button"
+              className="font-medium text-accent-strong underline"
+              onClick={() => inputRef.current?.click()}
+            >
+              choose files
+            </button>
+            <p className="mt-1 text-xs">
+              JPEG, PNG or WebP · up to 10 MB each
+              {capped && ` · ${limit - images.length} more can be added`}
+            </p>
+          </>
+        )}
       </div>
 
       <UploadProgress uploads={uploads} />
@@ -256,7 +306,12 @@ export function LotImages({ lotId }: { lotId: string }) {
                       src={image.url}
                       alt=""
                       loading="lazy"
-                      className="aspect-square w-full object-cover"
+                      // Contained, never cropped: this is the surface the
+                      // operator judges a photo on, and a cropped preview hides
+                      // what a bidder will see. The box keeps aspect-square so
+                      // the grid does not go ragged; the bands are black
+                      // because a theme-coloured one reads as a layout bug.
+                      className="aspect-square w-full bg-letterbox object-contain"
                     />
                     {isPrimary && (
                       <span

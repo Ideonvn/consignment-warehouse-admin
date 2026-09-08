@@ -470,7 +470,7 @@ export function LotCreateForm({ auctionId }: { auctionId: string }) {
                     <img
                       src={image.url}
                       alt=""
-                      className="aspect-square w-full rounded border border-border object-cover"
+                      className="aspect-square w-full rounded border border-border bg-letterbox object-contain"
                     />
                     <p className="truncate text-[11px] text-text-muted" title={image.file.name}>
                       {image.file.name}

@@ -67,6 +67,14 @@
 
   /* Dialog scrim. */
   --scrim: rgb(0 0 0 / 0.4);
+
+  /* Letterbox bands behind a contained photo. Photographic content reads
+     against black, and an operator judging what a bidder will see must not have
+     the frame colour move between themes — so this is the one token that is
+     deliberately identical in light and dark, like the status FILLS above.
+     It is a backdrop for imagery, never a text or boundary colour, so 1.4.11
+     does not bind; the container keeps its own --border for its edge. */
+  --letterbox: #000000;
 }
 
 /*
@@ -155,6 +163,7 @@
   --color-warning-fill-ink: var(--warning-fill-ink);
   --color-danger-fill-ink: var(--danger-fill-ink);
   --color-scrim: var(--scrim);
+  --color-letterbox: var(--letterbox);
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);

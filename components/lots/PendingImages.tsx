@@ -211,7 +211,9 @@ export function PendingImages({
                     <img
                       src={image.url}
                       alt=""
-                      className="aspect-square w-full object-cover"
+                      // Contained on black, as in the gallery — the preview
+                      // must show what was actually chosen.
+                      className="aspect-square w-full bg-letterbox object-contain"
                     />
                     {isPrimary && (
                       <span className="absolute top-1 left-1 rounded bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-accent-ink">

@@ -247,7 +247,7 @@ export function LotDetail({ lotId }: { lotId: string }) {
           />
         </div>
         <div className="flex min-w-0 flex-col gap-4">
-          <LotImages lotId={lot.id} />
+          <LotImages lotId={lot.id} limit={lot.image_limit} />
           <Panel title="Timing">
             <dl className="flex flex-col gap-2 text-sm">
               <div className="flex justify-between gap-2">

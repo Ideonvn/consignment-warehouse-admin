@@ -136,7 +136,9 @@ export function AuctionImage({ auction }: { auction: AuctionAdmin }) {
             <img
               src={auction.image_url}
               alt=""
-              className="h-24 w-32 shrink-0 rounded border border-border object-cover"
+              // Fixed 96x128 box either way: letterboxing changes what fills
+              // the box, not how much space it takes.
+              className="h-24 w-32 shrink-0 rounded border border-border bg-letterbox object-contain"
             />
           ) : (
             <div

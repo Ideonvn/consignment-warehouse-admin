@@ -109,9 +109,10 @@ export default function NewAuctionPage() {
       anti_snipe_window_seconds: 300,
       anti_snipe_extension_seconds: 300,
       max_extensions: 20,
-      // Private by default, matching the backend. A new auction being invisible
-      // until someone decides otherwise is the safe direction to be wrong in.
-      visibility: "private",
+      // Public by default, matching the backend's `AuctionCreateIn.visibility`
+      // default. Publishing is still a second gate — a public DRAFT is not on
+      // the public site — so this preselection exposes nothing on its own.
+      visibility: "public",
       deposit_amount_minor: 0,
       buyers_premium_bps: 0,
     },
@@ -278,11 +279,11 @@ export default function NewAuctionPage() {
             <Field
               label="Visibility"
               htmlFor="visibility"
-              hint="Private is the default. A public auction is browsable by anyone with no account at all; bidding still needs one. Changeable at any time afterwards."
+              hint="Public is the default: anyone can browse it with no account at all, once the auction is published. Bidding still needs an account. Choose private to keep it staff-only. Changeable at any time afterwards."
             >
               <Select id="visibility" {...register("visibility")}>
-                <option value="private">Private — staff only</option>
                 <option value="public">Public — anyone can browse it</option>
+                <option value="private">Private — staff only</option>
               </Select>
             </Field>
 
