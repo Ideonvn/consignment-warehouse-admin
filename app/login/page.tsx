@@ -4,12 +4,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
-import { Input } from "@/components/ui/Input";
 import { Note } from "@/components/ui/Feedback";
 import { errorMessage, isApiError } from "@/lib/api/errors";
 import { activeAuthProvider, startSignIn, useSessionStore } from "@/lib/auth";
 import { useSignInFlow } from "@/lib/auth/sign-in-flow";
 import { AuthShell } from "@/components/auth/AuthShell";
+
+// Whatever the active provider collects its identifier with. This screen does
+// not know it is a phone number.
+const IdentifierInput = activeAuthProvider.IdentifierInput;
 
 export default function LoginPage() {
   return (
@@ -78,18 +81,12 @@ function LoginForm() {
           error={error}
           required
         >
-          <Input
+          <IdentifierInput
             id="identifier"
-            name="identifier"
-            type="tel"
-            autoComplete="tel"
-            inputMode="tel"
             autoFocus
-            placeholder="+27820000001"
-            value={identifier}
             invalid={Boolean(error)}
-            onChange={(event) => {
-              setIdentifier(event.target.value);
+            onChange={(value) => {
+              setIdentifier(value);
               setError(null);
             }}
           />

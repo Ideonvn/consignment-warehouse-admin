@@ -8,7 +8,20 @@
  * picks the active one (plus the login screen, which asks the provider what
  * kind of flow it is).
  */
+import type { ComponentType } from "react";
 import type { Me, UserRole } from "@/types/api";
+
+export interface IdentifierInputProps {
+  id: string;
+  /**
+   * The identifier as `validateIdentifier` and `startSignIn` want it — composed
+   * E.164 for phone. The input owns its draft (country, grouping); the screen
+   * only ever holds this.
+   */
+  onChange: (identifier: string) => void;
+  invalid?: boolean;
+  autoFocus?: boolean;
+}
 
 export interface AuthTokens {
   accessToken: string;
@@ -45,6 +58,12 @@ export interface AuthProvider {
     secret: string;
     secretHint: string;
   };
+  /**
+   * The control that collects the identifier. The provider supplies it so the
+   * login screen renders what it is handed and never learns what an identifier
+   * looks like — the same reason it reads `labels` from here.
+   */
+  readonly IdentifierInput: ComponentType<IdentifierInputProps>;
   /** Validate an identifier before spending a network call on it. */
   validateIdentifier(value: string): string | null;
   startSignIn(input: StartSignInInput): Promise<StartSignInResult>;

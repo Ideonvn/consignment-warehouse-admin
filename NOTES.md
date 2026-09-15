@@ -864,3 +864,186 @@ and marking the public case is the safer way round, since an absent mark can
 never be misread as a promise of privacy. The comment now says so, and says what
 to do if the list ever reads as a column of globes. Worth an operator's opinion
 before anyone acts on it.
+
+## Phone entry on the login screen (2026-09-15)
+
+The bidder app's phone parsing, ported: `lib/auth/phone.ts` and
+`lib/auth/countries.ts`, comments intact. The field is new and built from this
+app's `Select` and `Input`.
+
+**The provider supplies the input, not just a kind.** The brief leaned toward the
+provider declaring an identifier *kind* and the login screen choosing an input
+from it. That still puts a phone branch in `page.tsx`, which would import the
+phone field by name. Instead `AuthProvider` carries `IdentifierInput`, a
+component that reports the finished identifier string, and the screen renders
+whatever it is handed. One indirection instead of two, and `page.tsx` never
+names a phone. The cost is a React component type on the auth interface. A future
+OIDC provider has no input, so it will make that field optional in the same
+change that teaches the screen `kind: "redirect"`. The screen does not branch on
+`kind` today either, so that change would come to this screen regardless.
+
+**Two controls side by side, not a prefix inside one border.** The bidder app's
+`.field` rule moves the focus ring onto a rounded wrapper around a bare input.
+Here the country `Select` and the number `Input` each keep their own border,
+radius and the global `:focus-visible` ring. There is no wrapper shape to fix,
+so that rule was not ported, and no new focus CSS was needed.
+
+**Validation: one layer, rewritten for the composed value.** The field does
+not validate; `validateIdentifier` does, on submit, as before. The "start with
+the country code" branch was removed, because the field always composes a plus,
+so that message described input an operator can no longer type. It now says
+"too short/too long: +27 numbers have 9 digits after the code" for ZA, GB and the
+NANP, and gives the E.164 range elsewhere. Those are the countries whose
+`groups` pattern spells out the whole number. It keeps a generic "not a valid
+mobile number" for input that bypassed the field. The brief said the bidder app
+validates length per country inline. It does not: it checks the E.164 range on
+submit. The per-country length check is new here.
+
+**Nothing new touches the URL.** The composed number goes into `useSignInFlow`
+exactly as the raw one did. The field's draft state dies with the page.
+
+### Request for the bidder app — two parsing bugs, fixed here
+
+Measured by running the bidder app's own `phone.ts` through a keystroke replay,
+not by reading it:
+
+1. **Typing a `+` code one key at a time does not work.** A bare `+` parses to
+   an empty number under the current country, so the plus disappears from the
+   field. The digits typed next are then treated as local. `+44 7700 900123`
+   typed key by key goes out as `+27447700900123`, and `+678 555 1234` as
+   `+276785551234`, which is the very number the `UNLISTED_COUNTRY` comment says
+   was fixed. Pasting and autofill work, which is presumably why it went unseen.
+   Fix here: a bare `+` returns `UNLISTED_COUNTRY`, and `formatNational` shows the
+   plus for an unlisted number.
+2. **Clearing an unlisted number leaves the field on "Other".** Paste
+   `+678 555 1234`, delete it all, type `0821234567`, and it goes out as
+   `+821234567`, a South Korean number. Fix here: clearing the field while on
+   `UNLISTED_COUNTRY` falls back to `DEFAULT_COUNTRY`.
+
+Both fixes are marked "Admin-only" in `lib/auth/phone.ts` and should be carried
+into the bidder app, after which the markers come out. The per-country length
+message (`describePhoneProblem`) is worth taking too, but it is an addition, not
+a fix.
+
+### Verified against the running backend on 3100
+
+`make dev-all` on `localhost:8000`, with the existing seed. Every number was
+read from the request body the browser actually sent, not from the form.
+
+- **`0820000001`**, typed key by key, displayed `82 000 0001` under
+  `+27 South Africa` and sent `{"phone":"+27820000001"}`. Signed in as the
+  seeded admin.
+- **`+27 82 000 0000`**, typed key by key: the `+27` moved into the select and
+  the field read `82 000 0000`. It sent `+27820000000` and signed in as the
+  superadmin.
+- **`820000001`** sent `+27820000001`.
+- **Unlisted code `+678 555 1234`** displayed `+678 555 123 4` under "Other"
+  and sent `{"phone":"+6785551234"}`, with nothing prefixed. The trailing `4` is
+  the threes fallback, unchanged from the bidder app.
+- **Refresh on `/login/verify`** landed on `/login` ("Operator sign in"). The
+  URL only ever carried `next=%2Fauctions`.
+- **Too short (`08200000`)** showed *"That number is too short: +27 numbers have
+  9 digits after the code."* in dark theme. The backend log shows it sent
+  nothing: four OTP requests in total, one per case above.
+- **Both themes:** 36px select and input on the existing tokens, with the
+  global focus ring on whichever control has focus. The card is the same height
+  as before plus one hint line.
+- A keystroke replay of `phone.ts` passes all 16 entry and validation cases
+  here. The same replay run against the bidder app's copy fails the two cases
+  listed above.
+- `npm run typecheck`, `npm run lint` and `npm run build` are clean.
+
+The browser ran with `NEXT_PUBLIC_API_BASE_URL` overridden to `localhost`,
+because the backend binds `localhost` only and `.env.local` points at the LAN
+address. `.env.local` was not changed.
+
+## Participants: eligibility is earned by bidding (2026-09-15)
+
+The backend's bid gate is now `balance >= deposit` OR already bid in this
+auction, and `GET /admin/auctions/{id}/participants` uses the same rule, with a
+new `admitted_by_bid` field.
+
+**The "people have bid but no longer cover the deposit" banner is gone,
+because it could not match.** Checked against the backend code, not just the
+brief:
+- `has_bid` counts non-void bids on lots in the auction.
+- `admitted_by_bid` comes from `bidding.auction_bidders()`, the same join over
+  every bid status, voided included. So `has_bid` implies `admitted_by_bid`.
+- `is_eligible` is `balance >= required OR admitted`, so `has_bid` implies
+  `is_eligible`, and `!is_eligible && has_bid` has no rows.
+
+It was also read from rows that, on the default filter, the server had already
+narrowed to ineligible ones. Demonstrated below.
+
+The brief cites *"Delete rather than deprecate"* from `CLAUDE.md`. That line is
+not in `CLAUDE.md`. The banner went on the merits, because it described an
+impossible state.
+
+**Eligible with a shortfall is made legible on the row, not explained away.**
+Row tint and "Short by" used to move together, and now they can disagree:
+- The tint still follows `!is_eligible`: it marks the working list.
+- "Short by" stays visible on an eligible row but drops the warning ink, since
+  there it blocks nothing.
+- The "Can bid" cell reads **Yes · already bid here** exactly when
+  `is_eligible && shortfall_minor > 0`, which is the one case where the two
+  disagree. A bidder who covers the deposit gets a plain "Yes". Saying why there
+  would be noise.
+- "Bid yet" reads **voided only** when `admitted_by_bid && !has_bid`, the row
+  where the two fields visibly answer different questions.
+
+None of this touches `StatusBadge`, and no row grew: 45–45.5px, the same as
+before, set by the two-line bidder cell.
+
+**Not a debtors list, deliberately.** The default sort was "Biggest shortfall",
+which on "Everyone" would have floated admitted winners, the people who owe
+money, to the top. It is now "Cannot bid, then shortfall": every ineligible row
+first, then shortfall. The info note now states the whole rule and points at
+Outstanding for what people owe. There is no debt column, filter or badge here.
+
+**Copy that described half the rule was changed:**
+- the info note
+- the ineligible empty state ("Everyone can bid", not "Everyone is covered")
+- the deposit hints on the create and edit forms ("before their first bid
+  here")
+- the invalidation comments in `UserLedger` and the outstanding page
+- the participants paragraph in `CLAUDE.md`
+
+**Found, not changed, and backend-side:** with `deposit_amount_minor` of 0 the
+gate is skipped entirely, but the participants query still evaluates
+`balance >= 0`. So a negative-balance bidder in a no-deposit auction would be
+listed as "Not yet" while the API lets them bid. No auction here has a zero
+deposit and a participants screen, so it was not reproduced. Worth a
+`required == 0 OR …` in the query.
+
+### Verified against the running backend on 3100
+
+Autumn Fine Jewellery: live, R 5 000,00 deposit, 10% premium. Every figure was
+read back from the API or the DOM.
+
+- **The real case.** Nandi Zulu (`+27820000013`, exactly R 5 000,00) bid
+  R 150,00 on lot 19. Its close was pulled into the past in the database, and
+  the worker closed it as `ended_sold` and posted `lot_won` −R 150,00 and
+  `buyers_premium` −R 15,00. The API then returned balance 483500, shortfall
+  16500, `is_eligible: true`, `admitted_by_bid: true`, `has_bid: true`. On
+  screen: untinted row, muted "R 165,00", "Yes · already bid here", "1 bid". She
+  is absent from the default "Cannot bid" list.
+- **Never bid and short.** Craig Bekker (`+27820000014`, R 4 999,99) stays
+  `is_eligible: false`, in the `eligible=false` response (14 rows) and on the
+  default list: tinted, "R 0,01" in warning ink, "Not yet". Unchanged.
+- **Voided bid.** Refilwe Molefe bid R 99,00 on lot 1 and an admin voided it.
+  The API returned `admitted_by_bid: true`, `has_bid: false`, `bid_count: 0`,
+  and the row reads "Yes · voided only".
+- **The removed banner's predicate:** `!is_eligible && has_bid` matched 0 of 25
+  rows in the full list and 0 of 14 on the ineligible filter. `is_eligible &&
+  shortfall > 0` matched 1 (Nandi). There was also a baseline read before any
+  bid, where 0 rows matched.
+- **Sort:** on "Everyone", all 14 "Not yet" rows come before the first "Yes".
+- **Both themes.** The same three rows were read in light and dark, and no new
+  tokens were added. An eligible shortfall uses the existing `--text-muted`,
+  already measured at 5.43 / 8.14 on its surface. The ineligible row keeps
+  `--warning-tint` and `--warning-ink`. The reason is plain text, so it reads
+  "Yes already bid here", not "Yesalready…", which a first pass rendered.
+- `npm run typecheck`, `npm run lint` and `npm run build` are clean.
+
+Test data left behind: Nandi's win on lot 19, with its two charges, and
+Refilwe's voided bid on lot 1. Both are in the local database only.

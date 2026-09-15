@@ -76,6 +76,21 @@ Two details that are load-bearing:
   permanently. A 401 from refresh is terminal — clear state, go to login, never
   retry.
 
+### Phone entry — the same logic lives in two repos
+
+The login field accepts `0820000001`, `+27 82 000 0001` or `820000001` and
+composes one E.164 string. That logic is **ported from the bidder app**:
+`lib/auth/phone.ts` and `lib/auth/countries.ts` here mirror the same paths in
+`consignment-warehouse-web`. There is no shared package, on purpose; a package
+for ~100 lines across two apps is not worth the infrastructure. **A fix to
+either copy must be carried across to the other.** The differences today are
+marked "Admin-only" in `phone.ts` and listed in `NOTES.md`.
+
+Only the logic is shared. The field itself (`lib/auth/PhoneField.tsx`) is this
+app's `Select` + `Input` at this app's density; do not port the bidder field's
+look. It reaches the login screen through `AuthProvider.IdentifierInput`, so
+`app/login/page.tsx` still knows nothing about phones.
+
 ## The rules that are load-bearing
 
 Each of these exists because breaking it costs money or trust.
@@ -247,10 +262,19 @@ localhost link is broken rather than merely degraded.
 
 **Participants are a query, not a roster.** `GET /admin/auctions/{id}/participants`
 is computed on read — there is no participant table, no registration and no
-approval step, so **do not build an "approve" control**. Eligibility falls out of
-the balance against the auction's deposit, which means recording a deposit is
-what makes someone eligible; the screen defaults to the ineligible filter
-because that is the working list, and every row links to that person's ledger.
+approval step, so **do not build an "approve" control**. Eligibility is the bid
+gate's own rule: the balance covers the deposit, **or** the person has already
+bid in that auction (voided bids included). It is earned once and not revoked,
+so recording a deposit is what makes someone *new* eligible, and a winner whose
+charges take them below the deposit keeps bidding. The screen defaults to the
+ineligible filter, which is exactly "never bid here and short", and every row
+links to that person's ledger.
+
+**An eligible row with a shortfall is correct, not a bug.** `admitted_by_bid`
+says a bid let them in; `has_bid` counts live bids only, so "voided only" is a
+real row. **Participants answers "can this person bid", never "who owes money".**
+That is `/outstanding`. Do not surface debt here: two screens answering one
+question is how they drift.
 
 **The buyer's premium is basis points.** `buyers_premium_bps` of 1500 is 15%.
 Operators enter a percentage and `parsePercentToBps` converts; the field always

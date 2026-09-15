@@ -203,7 +203,8 @@ export default function OutstandingPage() {
               queryKey: queryKeys.user(paying.user_id),
             });
           }
-          // Eligibility for any auction follows the balance.
+          // A payment can make someone eligible for an auction they have not
+          // bid in yet.
           void client.invalidateQueries({ queryKey: ["auction"] });
         }}
       />

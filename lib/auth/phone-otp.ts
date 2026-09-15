@@ -1,13 +1,16 @@
 /**
  * Phone OTP provider — the only mechanism the backend has today.
  *
- * Everything OTP-specific stops at this file. It talks to the raw transport
- * (not the authenticated client) so there is no dependency cycle: the client
- * calls refresh, refresh calls the provider, the provider calls the transport.
+ * Everything OTP-specific stops at `lib/auth`: this file, plus the phone field
+ * and its helpers beside it. It talks to the raw transport (not the
+ * authenticated client) so there is no dependency cycle: the client calls
+ * refresh, refresh calls the provider, the provider calls the transport.
  */
 import { httpRequest } from "@/lib/api/http";
 import { meSchema, tokenPairSchema, type Me } from "@/types/api";
 import { getDeviceId, getDeviceName } from "./device";
+import { describePhoneProblem } from "./phone";
+import { PhoneField } from "./PhoneField";
 import { getAccessToken } from "./session";
 import type {
   AuthProvider,
@@ -16,8 +19,6 @@ import type {
   StartSignInInput,
   StartSignInResult,
 } from "./types";
-
-const E164 = /^\+[1-9]\d{7,14}$/;
 
 function toTokens(payload: unknown): AuthTokens {
   const parsed = tokenPairSchema.parse(payload);
@@ -34,7 +35,7 @@ export const phoneOtpProvider: AuthProvider = {
   labels: {
     identifier: "Mobile number",
     identifierHint:
-      "Full international format, e.g. +27820000001. The backend does not infer a country code.",
+      "Type it as you dial it, e.g. 082 000 0001. For another country, pick its code or type the number with its +.",
     // No digit count here on purpose. The backend decides how long a code is —
     // six in production, the four-character 0000 locally — and a number in the
     // label is an assertion this app cannot keep true. The bidder app needs a
@@ -51,14 +52,15 @@ export const phoneOtpProvider: AuthProvider = {
     secretHint: "Sent by SMS.",
   },
 
+  IdentifierInput: PhoneField,
+
+  // Still the backstop — the interface promises validation before a network
+  // call. The field always composes a plus, so the messages are about length
+  // for the country, not about a format the field no longer lets anyone type.
   validateIdentifier(value) {
     const trimmed = value.trim();
     if (!trimmed) return "Enter a mobile number";
-    if (!trimmed.startsWith("+")) {
-      return "Start with the country code, e.g. +27 for South Africa";
-    }
-    if (!E164.test(trimmed)) return "That is not a valid international number";
-    return null;
+    return describePhoneProblem(trimmed);
   },
 
   async startSignIn({ identifier }: StartSignInInput): Promise<StartSignInResult> {

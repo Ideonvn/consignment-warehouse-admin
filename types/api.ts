@@ -557,7 +557,14 @@ export const participantSchema = z.object({
   required_deposit_minor: z.number(),
   /** Floored at zero by the backend. */
   shortfall_minor: z.number(),
+  /** Balance covers the deposit, OR `admitted_by_bid` — the bid gate's rule exactly. */
   is_eligible: z.boolean(),
+  /**
+   * Has bid in this auction at all, voided bids included. Admission is earned
+   * once and not revoked, so this can be true alongside a non-zero shortfall.
+   */
+  admitted_by_bid: z.boolean(),
+  /** Non-void bids only: bidding activity, not admission. */
   has_bid: z.boolean(),
   bid_count: z.number(),
 });

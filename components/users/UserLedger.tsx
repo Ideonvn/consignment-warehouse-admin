@@ -66,7 +66,8 @@ export function UserLedger({
   function invalidate() {
     void client.invalidateQueries({ queryKey: queryKeys.ledgerRoot(userId) });
     void client.invalidateQueries({ queryKey: queryKeys.user(userId) });
-    // Eligibility is derived from the balance, so any participants list is stale.
+    // Eligibility for anyone who has not bid in an auction yet follows the
+    // balance, so any participants list is stale.
     void client.invalidateQueries({ queryKey: ["auction"] });
   }
 

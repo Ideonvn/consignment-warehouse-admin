@@ -385,7 +385,7 @@ export function AuctionEditForm({
               label="Bidder deposit"
               frozenReason={frozen.deposit_amount_minor}
               error={fieldError("deposit_amount_minor")}
-              hint="What someone must hold in credit before they can bid here. Zero means no deposit."
+              hint="What someone must hold in credit before their first bid here. Zero means no deposit."
             >
               <MoneyInput
                 value={draft.deposit_amount_minor}

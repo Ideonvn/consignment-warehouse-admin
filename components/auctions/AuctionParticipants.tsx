@@ -16,15 +16,19 @@ type Filter = "ineligible" | "all";
 type SortKey = "shortfall" | "name" | "balance";
 
 /**
- * Who can bid and who cannot.
+ * Who can bid and who cannot — and only that.
  *
- * Computed on read by the backend — there is no registration or approval step,
- * so there is deliberately no "approve" control here. Eligibility follows from
- * the balance, which means recording a deposit is what makes someone eligible;
- * every row links straight to that person's ledger so it is one hop away.
+ * Computed on read by the backend with the bid gate's own rule: the balance
+ * covers the deposit, OR the person has already bid in this auction (voided
+ * bids included). Admission is earned once and not revoked, so a winner whose
+ * charges take them below the deposit keeps bidding. There is no registration
+ * or approval step, so there is deliberately no "approve" control here.
  *
- * Defaults to the ineligible list, because that is the working list: the people
- * to chase before the auction opens.
+ * Defaults to the ineligible list, which is now exactly "never bid here and
+ * short": the people a deposit would unblock. Every row links to the ledger.
+ *
+ * Not a debtors list. An eligible row can carry a shortfall, and that is money
+ * owed, which is `/outstanding`'s question. Two screens answering it would drift.
  */
 export function AuctionParticipants({ auction }: { auction: AuctionAdmin }) {
   const [filter, setFilter] = useState<Filter>("ineligible");
@@ -49,15 +53,20 @@ export function AuctionParticipants({ auction }: { auction: AuctionAdmin }) {
       );
     });
     return [...list].sort((a, b) => {
-      if (sort === "shortfall") return b.shortfall_minor - a.shortfall_minor;
+      // Those who cannot bid first: a shortfall on an admitted bidder blocks
+      // nothing, and sorting it to the top would turn this into a debtors list.
+      if (sort === "shortfall") {
+        return (
+          Number(a.is_eligible) - Number(b.is_eligible) ||
+          b.shortfall_minor - a.shortfall_minor
+        );
+      }
       if (sort === "balance") return a.balance_minor - b.balance_minor;
       return `${a.first_name ?? ""} ${a.last_name ?? ""} ${a.handle}`.localeCompare(
         `${b.first_name ?? ""} ${b.last_name ?? ""} ${b.handle}`,
       );
     });
   }, [data, search, sort]);
-
-  const ineligibleWhoBid = rows.filter((p) => !p.is_eligible && p.has_bid);
 
   if (error) {
     return (
@@ -68,19 +77,20 @@ export function AuctionParticipants({ auction }: { auction: AuctionAdmin }) {
   return (
     <div className="flex flex-col gap-3">
       <Note tone="info">
-        Eligibility is worked out from each bidder&apos;s balance against this
-        auction&apos;s{" "}
+        Someone can bid once their balance covers this auction&apos;s{" "}
         <strong>{formatMoney(auction.deposit_amount_minor, currency)}</strong>{" "}
-        deposit. There is nothing to approve — record a deposit and the person
-        becomes eligible straight away.
+        deposit, and after their first bid here they can keep bidding for the
+        rest of the sale, even if a win takes them below it. There is nothing to
+        approve: record a deposit and someone new can bid straight away. What
+        people owe is on{" "}
+        <Link
+          href="/outstanding"
+          className="font-medium text-accent-strong underline underline-offset-2"
+        >
+          Outstanding
+        </Link>
+        .
       </Note>
-
-      {ineligibleWhoBid.length > 0 && (
-        <Note tone="warning">
-          {ineligibleWhoBid.length} {ineligibleWhoBid.length === 1 ? "person has" : "people have"} bid
-          in this auction but no longer cover the deposit.
-        </Note>
-      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex items-center rounded border border-border p-0.5">
@@ -119,7 +129,7 @@ export function AuctionParticipants({ auction }: { auction: AuctionAdmin }) {
             aria-label="Sort participants"
             className="h-7 rounded border border-border-strong bg-surface px-1.5 text-xs"
           >
-            <option value="shortfall">Biggest shortfall</option>
+            <option value="shortfall">Cannot bid, then shortfall</option>
             <option value="balance">Lowest balance</option>
             <option value="name">Name</option>
           </select>
@@ -136,12 +146,12 @@ export function AuctionParticipants({ auction }: { auction: AuctionAdmin }) {
         <EmptyState
           title={
             filter === "ineligible"
-              ? "Everyone is covered"
+              ? "Everyone can bid"
               : "Nobody to show yet"
           }
           description={
             filter === "ineligible"
-              ? "No one is short of this auction's deposit."
+              ? "Everyone here either covers the deposit or has already bid in this auction."
               : "Bidders appear here once they have an account."
           }
           action={
@@ -204,6 +214,9 @@ function ParticipantRow({
 }) {
   const name = [p.first_name, p.last_name].filter(Boolean).join(" ");
   const balance = describeBalance(p.balance_minor, currency);
+  // The one case where "can bid" and "short of the deposit" disagree: a bid
+  // admitted them, and a win (usually) has since taken them below it.
+  const admittedWhileShort = p.is_eligible && p.shortfall_minor > 0;
 
   return (
     <tr className={cn("border-t border-border", !p.is_eligible && "bg-warning-tint")}>
@@ -231,7 +244,15 @@ function ParticipantRow({
       <td className="tnum px-2.5 py-1.5 text-right text-text-muted">
         {formatMoney(p.required_deposit_minor, currency)}
       </td>
-      <td className="tnum px-2.5 py-1.5 text-right font-semibold text-warning-ink">
+      {/* Warning ink only where the shortfall is what stops them bidding. For an
+          admitted bidder it is a fact, not a blocker; what they owe is chased
+          from Outstanding. */}
+      <td
+        className={cn(
+          "tnum px-2.5 py-1.5 text-right",
+          p.is_eligible ? "text-text-muted" : "font-semibold text-warning-ink",
+        )}
+      >
         {p.shortfall_minor > 0 ? formatMoney(p.shortfall_minor, currency) : ""}
       </td>
       <td className="px-2.5 py-1.5">
@@ -252,12 +273,22 @@ function ParticipantRow({
           />
           {p.is_eligible ? "Yes" : "Not yet"}
         </span>
+        {admittedWhileShort && " "}
+        {admittedWhileShort && (
+          <span className="text-xs whitespace-nowrap text-text-muted">
+            already bid here
+          </span>
+        )}
       </td>
       <td className="px-2.5 py-1.5 text-xs">
         {p.has_bid ? (
           <span className="tnum">
             {p.bid_count} bid{p.bid_count === 1 ? "" : "s"}
           </span>
+        ) : p.admitted_by_bid ? (
+          // Every bid they placed here was voided. Voiding corrects a lot; it
+          // does not take back their place in the sale.
+          <span className="text-text-muted">voided only</span>
         ) : (
           <span className="text-text-muted">—</span>
         )}

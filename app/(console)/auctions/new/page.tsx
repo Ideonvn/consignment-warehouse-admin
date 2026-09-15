@@ -480,7 +480,7 @@ export default function NewAuctionPage() {
               render={({ field }) => (
                 <Field
                   label="Bidder deposit"
-                  hint="What someone must hold in credit before they can bid here. Zero means no deposit."
+                  hint="What someone must hold in credit before their first bid here. Zero means no deposit."
                 >
                   <MoneyInput
                     value={field.value ?? 0}
