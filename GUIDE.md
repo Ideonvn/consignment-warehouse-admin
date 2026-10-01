@@ -22,7 +22,7 @@ opens auctions at their start time, closes lots when the clock runs out, decides
 sold, and raises the ledger charges for winners. Without it nothing opens or closes, the Decisions
 queue stays empty, and no statement ever shows a purchase.
 
-MinIO must be up (it comes with the dev dependencies) or images fail.
+Object storage must be up (it comes with the dev dependencies) or images fail.
 
 Then here:
 

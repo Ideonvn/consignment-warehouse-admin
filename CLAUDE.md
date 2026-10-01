@@ -510,7 +510,7 @@ session dies on the first reload. See `terraform/README.md`.
 
 The backend must be running: `make dev-all` (API plus the lifecycle worker that
 opens and closes lots — without it nothing ever closes, so the monitor and the
-decisions queue have nothing to show), `make seed`, and MinIO up for images.
+decisions queue have nothing to show), `make seed`, and object storage up for images.
 
 While the backend runs with `APP_ENV=local` the **OTP code is always `0000`**.
 Seeded: superadmin `+27820000000`, admin `+27820000001`, bidders

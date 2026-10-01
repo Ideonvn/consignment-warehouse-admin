@@ -18,13 +18,13 @@ never modifies the backend**; requests for it are collected in
 - **Node.js 20.9+** (Next.js 16 minimum).
 - **The backend running locally.** From the backend repo:
   ```bash
-  make dev-all # API on http://localhost:8400, Postgres, Valkey, MinIO, and the
+  make dev-all # API on http://localhost:8400, Postgres, Valkey, object storage, and the
                # worker that closes lots when their clock runs out
   make seed    # seeded superadmin, admin, bidders, and a live auction with lots
   ```
   `make dev` alone is enough for everything except lots actually closing — the
   monitor and the decisions queue need the worker running.
-- **MinIO up** — photo uploads go directly from the browser to object storage.
+- **Object storage up** — photo uploads go directly from the browser to it.
   `make dev` brings it up with the rest of the stack.
 
 Seeded accounts (while the backend runs with `APP_ENV=local`, **the OTP code is
