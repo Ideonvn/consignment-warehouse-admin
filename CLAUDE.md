@@ -476,17 +476,25 @@ types/api.ts    every API shape as a zod schema with its inferred type
 ## Running it
 
 ```bash
-npm run dev        # http://localhost:3100
+npm run dev        # http://localhost:3410
 npm run typecheck  # tsc --noEmit
 npm run lint       # eslint, including the React Compiler rules
 npm run build
 ```
 
-**`dev` and `start` are pinned to port 3100 and must stay there.** 3100 is the
-origin the backend allows for this app; 3000 belongs to the bidder app. On any
+**`dev` and `start` are pinned to port 3410 and must stay there.** 3410 is the
+origin the backend allows for this app; 3400 belongs to the bidder app. On any
 other port every preflight is rejected with a bare 400 and no CORS headers,
 which the browser reports as an opaque network failure — indistinguishable from
 the backend being down, and a genuinely confusing hour if you do not know it.
+
+**Reversal, 2026-10-01: this was pinned to 3100 (bidder app 3000, API 8000) and
+that pin said it must stay there.** The rule never was about 3100 — it is about
+matching `CORS_ALLOWED_ORIGINS` exactly — and a second product on this machine
+now holds `:3000` and `:8000`, so Consignment Warehouse moved to its own dev
+block: **API 8400, bidder web 3400, this portal 3410.** The backend's allowlist
+default moved with it. The failure mode above is unchanged, and **production is
+untouched**.
 
 **The same rule applies in production, at a new address.** The portal is served
 from `https://admin.consignment-warehouse.com` and the API's

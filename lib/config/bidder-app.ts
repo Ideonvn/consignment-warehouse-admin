@@ -9,7 +9,7 @@
  * The base is a build-time `NEXT_PUBLIC_*`, so it is inlined into the bundle
  * and a change needs a redeploy, not a restart. It falls back to production
  * rather than to localhost: a share link is copied and pasted to someone else,
- * so a link to `localhost:3000` is not a degraded link, it is a broken one that
+ * so a link to `localhost:3400` is not a degraded link, it is a broken one that
  * looks fine to the person who copied it.
  */
 const DEFAULT_BIDDER_APP_URL = "https://consignment-warehouse.com";

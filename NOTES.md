@@ -4,11 +4,14 @@ Running log of judgement calls, deferrals and things to ask the backend for.
 
 ## Judgement calls
 
-**The dev server runs on port 3100.** The backend's CORS allowlist is
-`http://localhost:3000` for the bidder app and `http://localhost:3100` for this
+**The dev server runs on port 3410.** The backend's CORS allowlist is
+`http://localhost:3400` for the bidder app and `http://localhost:3410` for this
 portal, so both run against the same backend. `npm run dev` and `npm run start`
-are pinned to 3100. This is now a dedicated admin origin rather than the
-borrowed Vite port the portal used to sit on.
+are pinned to 3410. This is a dedicated admin origin rather than the borrowed
+Vite port the portal used to sit on. It was 3100 (bidder 3000, API 8000) until
+2026-10-01, when Consignment Warehouse moved to the 8400 / 3400 / 3410 block
+because another product on the same machine holds `:3000` and `:8000` — see the
+reversal recorded in `CLAUDE.md`. Production is unaffected.
 
 **Money parsing is strict rather than clever.** `MoneyInput` accepts digits with
 a single `.` or `,` as the decimal separator and ignores spaces. Anything
@@ -679,7 +682,7 @@ be made correct by extending the count test, only by a public-suffix list, and
 this repo will never set such a value.
 
 **Flagged, not fixed: the localhost fallbacks in `lib/api/http.ts` and
-`lib/realtime/socket.ts`.** Both fall back to `http://localhost:8000` when their
+`lib/realtime/socket.ts`.** Both fall back to `http://localhost:8400` when their
 `NEXT_PUBLIC_*` variable is unset. Because those values are inlined at build
 time, a build that lost its Amplify branch variables would ship a production
 bundle pointed at the operator's own machine, failing as a network error on every

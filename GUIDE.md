@@ -27,10 +27,10 @@ MinIO must be up (it comes with the dev dependencies) or images fail.
 Then here:
 
 ```bash
-npm run dev       # http://localhost:3100
+npm run dev       # http://localhost:3410
 ```
 
-**Port 3100 is not optional.** The backend allows `localhost:3000` (bidder app) and `localhost:3100`
+**Port 3410 is not optional.** The backend allows `localhost:3400` (bidder app) and `localhost:3410`
 (this one) as origins. On any other port every request fails with an opaque network error that looks
 exactly like the backend being down.
 
@@ -354,7 +354,7 @@ buyer's premium line if the auction has one. You do not raise those by hand.
 Work through these in order. Each says what to do and what should happen. Anything that does not
 match is worth writing down.
 
-You want three browser contexts: this portal as admin, and two bidder windows on `localhost:3000`
+You want three browser contexts: this portal as admin, and two bidder windows on `localhost:3400`
 signed in as **different** bidders — use a private window for the second.
 
 Re-seed first (`make seed-fresh`) so the time-sensitive auctions are fresh.

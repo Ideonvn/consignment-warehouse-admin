@@ -17,7 +17,7 @@ frontend:
         # Fail before installing anything if either public variable is missing.
         #
         # Both are inlined into the client bundle at build time, and lib/ falls
-        # back to http://localhost:8000 when they are unset — deliberately, so
+        # back to http://localhost:8400 when they are unset — deliberately, so
         # `npm run dev` works without a .env.local. That fallback is right for a
         # laptop and a trap for a deploy: a build that lost its branch
         # environment variables would ship a bundle pointed at a developer's own

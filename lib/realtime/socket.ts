@@ -38,7 +38,7 @@ export interface RealtimeHandlers {
 }
 
 function wsUrl(): string {
-  return process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000/api/v1/ws";
+  return process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8400/api/v1/ws";
 }
 
 export class RealtimeClient {

@@ -138,7 +138,7 @@ Two things do still need a human, and neither is a DNS record:
 
 ## CORS — the production counterpart of the port rule
 
-`CLAUDE.md` records the local version: the dev server is pinned to port 3100
+`CLAUDE.md` records the local version: the dev server is pinned to port 3410
 because on any other port every preflight is rejected with a bare `400` and no
 CORS headers, which the browser reports as an opaque network failure —
 indistinguishable from the API being down.
