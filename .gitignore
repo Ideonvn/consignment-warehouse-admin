@@ -44,3 +44,6 @@ next-env.d.ts
 
 # Playwright MCP writes snapshots, screenshots and console logs here.
 .playwright-mcp/
+
+# Agent prompt files — local workflow artifacts, not part of the project.
+PROMPT-*.md
