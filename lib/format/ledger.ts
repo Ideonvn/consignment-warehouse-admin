@@ -50,8 +50,8 @@ export const LEDGER_ENTRY_META: Record<LedgerEntryType, LedgerEntryMeta> = {
     hint: "Raised automatically when a lot closes to them.",
     postable: false,
   },
-  buyers_premium: {
-    label: "Buyer's premium",
+  commission: {
+    label: "Commission",
     effect: "debit",
     hint: "Raised automatically alongside a won lot.",
     postable: false,

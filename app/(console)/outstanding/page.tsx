@@ -67,7 +67,7 @@ export default function OutstandingPage() {
           title={page === 0 ? "Nobody owes anything" : "No more to show"}
           description={
             page === 0
-              ? "Every account is settled or in credit. Balances land here as lots close and premiums are raised."
+              ? "Every account is settled or in credit. Balances land here as lots close and commission is raised."
               : "You have reached the end of the list."
           }
           action={

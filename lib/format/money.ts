@@ -98,7 +98,7 @@ export function formatShortfall(
 /* --------------------------------------------------------------- rates */
 
 /**
- * The buyer's premium is stored in BASIS POINTS — 1500 is 15%. Operators think
+ * The commission is stored in BASIS POINTS — 1500 is 15%. Operators think
  * in percent, so the UI collects a percentage and converts here, and always
  * shows the stored value back so there is no ambiguity about what was saved.
  */

@@ -191,8 +191,8 @@ direction is recoverable (the read shape carries no `direction`). The statement
 splits it into Charge and Credit columns; balances are stated as sentences —
 "R2 000,00 owing", "R10 000,00 in credit" — because a misread minus sign means
 chasing the wrong person. `lib/format/ledger.ts` owns that wording and the
-entry-type labels (`lot_won` is "Lot won", `buyers_premium` is "Buyer's
-premium", `reversal` is "Correction").
+entry-type labels (`lot_won` is "Lot won", `commission` is "Commission",
+`reversal` is "Correction").
 
 **Outstanding is a query too, and settling is just a `payment`.**
 `GET /admin/outstanding` is computed from the ledger the same way participants
@@ -276,11 +276,11 @@ real row. **Participants answers "can this person bid", never "who owes money".*
 That is `/outstanding`. Do not surface debt here: two screens answering one
 question is how they drift.
 
-**The buyer's premium is basis points.** `buyers_premium_bps` of 1500 is 15%.
+**The commission is basis points.** `commission_bps` of 1500 is 15%.
 Operators enter a percentage and `parsePercentToBps` converts; the field always
 echoes the stored bps back, because a rate that silently means a hundredth of
 what was intended shows up on an invoice rather than in the form. Both
-`deposit_amount_minor` and `buyers_premium_bps` **freeze once any lot has a
+`deposit_amount_minor` and `commission_bps` **freeze once any lot has a
 bid**, through the same `freezeReasons` map as the other bidding rules.
 
 **The auction cover image is not frozen.** Auctions keep name, description and

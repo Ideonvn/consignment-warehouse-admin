@@ -128,7 +128,7 @@ export const auctionAdminSchema = z.object({
   /** What a bidder must hold in credit before this auction lets them bid. */
   deposit_amount_minor: z.number(),
   /** Basis points: 1500 is 15%. Never shown raw to the operator. */
-  buyers_premium_bps: z.number(),
+  commission_bps: z.number(),
   /** Public means anyone can browse it without an account. Defaults to public. */
   visibility: auctionVisibilitySchema,
 });
@@ -169,7 +169,7 @@ export const createAuctionSchema = z.object({
   anti_snipe_extension_seconds: z.number().int().min(0).optional(),
   max_extensions: z.number().int().min(0).optional(),
   deposit_amount_minor: z.number().int().min(0).optional(),
-  buyers_premium_bps: z.number().int().min(0).max(10000).optional(),
+  commission_bps: z.number().int().min(0).max(10000).optional(),
   /** Ordinary field on the create payload — no two-phase dance like the image. */
   visibility: auctionVisibilitySchema.optional(),
 });
@@ -186,7 +186,7 @@ export const updateAuctionSchema = z.object({
   anti_snipe_extension_seconds: z.number().int().optional(),
   max_extensions: z.number().int().optional(),
   deposit_amount_minor: z.number().int().min(0).optional(),
-  buyers_premium_bps: z.number().int().min(0).max(10000).optional(),
+  commission_bps: z.number().int().min(0).max(10000).optional(),
   /** Never frozen: changeable at any time, including mid-auction. */
   visibility: auctionVisibilitySchema.optional(),
   confirm_shorten: z.boolean().optional(),
@@ -487,7 +487,7 @@ export const ledgerEntryTypeSchema = z.enum([
   "deposit",
   "payment",
   "lot_won",
-  "buyers_premium",
+  "commission",
   "refund",
   "adjustment",
   "reversal",

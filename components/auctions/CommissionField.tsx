@@ -6,14 +6,14 @@ import { Input } from "@/components/ui/Input";
 import { bpsToPercentString, parsePercentToBps } from "@/lib/format/money";
 
 /**
- * The buyer's premium, entered as a percentage and stored as basis points.
+ * The commission, entered as a percentage and stored as basis points.
  *
  * Operators think in percent; the backend stores bps (1500 is 15%). The stored
  * value is echoed under the field on purpose — a rate that silently means a
  * hundredth of what someone intended is exactly the kind of thing that only
  * surfaces on an invoice.
  */
-export function PremiumField({
+export function CommissionField({
   bps,
   frozenReason,
   error,
@@ -37,8 +37,8 @@ export function PremiumField({
 
   return (
     <Field
-      label="Buyer's premium"
-      htmlFor="buyers-premium"
+      label="Commission"
+      htmlFor="commission"
       frozenReason={frozenReason}
       error={error ?? parseError ?? undefined}
       hint={
@@ -49,7 +49,7 @@ export function PremiumField({
     >
       <div className="relative">
         <Input
-          id="buyers-premium"
+          id="commission"
           inputMode="decimal"
           autoComplete="off"
           disabled={Boolean(frozenReason)}

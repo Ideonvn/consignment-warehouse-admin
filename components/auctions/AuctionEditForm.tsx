@@ -10,7 +10,7 @@ import { Field } from "@/components/ui/Field";
 import { Note } from "@/components/ui/Feedback";
 import { Input, Textarea } from "@/components/ui/Input";
 import { MoneyInput } from "@/components/ui/MoneyInput";
-import { PremiumField } from "./PremiumField";
+import { CommissionField } from "./CommissionField";
 import { Panel } from "@/components/ui/Panel";
 import { updateAuction } from "@/lib/api/endpoints";
 import { errorMessage, isApiError } from "@/lib/api/errors";
@@ -32,7 +32,7 @@ function freezeReasons(auction: AuctionAdmin, anyLotHasBid: boolean) {
     anti_snipe_extension_seconds: bidFreeze,
     max_extensions: bidFreeze,
     deposit_amount_minor: bidFreeze,
-    buyers_premium_bps: bidFreeze,
+    commission_bps: bidFreeze,
     starts_at:
       auction.status === "live"
         ? "Locked: the auction is already live, so it cannot be given a different opening time."
@@ -52,7 +52,7 @@ const FIELD_LABELS: Record<string, string> = {
   anti_snipe_extension_seconds: "Extension",
   max_extensions: "Max extensions",
   deposit_amount_minor: "Bidder deposit",
-  buyers_premium_bps: "Buyer's premium",
+  commission_bps: "Commission",
 };
 
 /** Swap the column name out of a frozen-field message for its on-screen label. */
@@ -75,7 +75,7 @@ interface Draft {
   anti_snipe_extension_seconds: number;
   max_extensions: number;
   deposit_amount_minor: number;
-  buyers_premium_bps: number;
+  commission_bps: number;
 }
 
 function toDraft(auction: AuctionAdmin): Draft {
@@ -89,7 +89,7 @@ function toDraft(auction: AuctionAdmin): Draft {
     anti_snipe_extension_seconds: auction.anti_snipe_extension_seconds,
     max_extensions: auction.max_extensions,
     deposit_amount_minor: auction.deposit_amount_minor,
-    buyers_premium_bps: auction.buyers_premium_bps,
+    commission_bps: auction.commission_bps,
   };
 }
 
@@ -160,8 +160,8 @@ export function AuctionEditForm({
       if (draft.deposit_amount_minor !== auction.deposit_amount_minor) {
         patch.deposit_amount_minor = draft.deposit_amount_minor;
       }
-      if (draft.buyers_premium_bps !== auction.buyers_premium_bps) {
-        patch.buyers_premium_bps = draft.buyers_premium_bps;
+      if (draft.commission_bps !== auction.commission_bps) {
+        patch.commission_bps = draft.commission_bps;
       }
     }
     if (confirmShorten) patch.confirm_shorten = true;
@@ -397,11 +397,11 @@ export function AuctionEditForm({
               />
             </Field>
 
-            <PremiumField
-              bps={draft.buyers_premium_bps}
-              frozenReason={frozen.buyers_premium_bps}
-              error={fieldError("buyers_premium_bps")}
-              onChange={(bps) => setDraft({ ...draft, buyers_premium_bps: bps })}
+            <CommissionField
+              bps={draft.commission_bps}
+              frozenReason={frozen.commission_bps}
+              error={fieldError("commission_bps")}
+              onChange={(bps) => setDraft({ ...draft, commission_bps: bps })}
             />
           </div>
 

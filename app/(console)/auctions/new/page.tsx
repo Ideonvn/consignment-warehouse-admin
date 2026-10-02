@@ -16,7 +16,7 @@ import { Input, Select, Textarea } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { Panel } from "@/components/ui/Panel";
-import { PremiumField } from "@/components/auctions/PremiumField";
+import { CommissionField } from "@/components/auctions/CommissionField";
 import {
   confirmAuctionImage,
   createAuction,
@@ -61,7 +61,7 @@ const formSchema = z
     max_extensions: z.number().int().min(0).max(1000),
     visibility: auctionVisibilitySchema,
     deposit_amount_minor: z.number().int().min(0),
-    buyers_premium_bps: z.number().int().min(0).max(10000),
+    commission_bps: z.number().int().min(0).max(10000),
   })
   .refine((data) => Date.parse(data.ends_at) > Date.parse(data.starts_at), {
     message: "The closing time must be after the opening time",
@@ -114,7 +114,7 @@ export default function NewAuctionPage() {
       // the public site — so this preselection exposes nothing on its own.
       visibility: "public",
       deposit_amount_minor: 0,
-      buyers_premium_bps: 0,
+      commission_bps: 0,
     },
   });
 
@@ -136,7 +136,7 @@ export default function NewAuctionPage() {
         max_extensions: parsed.max_extensions,
         visibility: parsed.visibility,
         deposit_amount_minor: parsed.deposit_amount_minor,
-        buyers_premium_bps: parsed.buyers_premium_bps,
+        commission_bps: parsed.commission_bps,
       });
 
       // Rules can only be attached once the auction exists.
@@ -493,9 +493,9 @@ export default function NewAuctionPage() {
 
             <Controller
               control={control}
-              name="buyers_premium_bps"
+              name="commission_bps"
               render={({ field }) => (
-                <PremiumField
+                <CommissionField
                   bps={field.value ?? 0}
                   onChange={(bps) => field.onChange(bps)}
                 />

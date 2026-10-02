@@ -54,7 +54,7 @@ The OTP is **`0000`** for every account.
 
 Five auctions, one per lifecycle state:
 
-| Slug | Status | Deposit | Premium | What it is for |
+| Slug | Status | Deposit | Commission | What it is for |
 |---|---|---|---|---|
 | `winter-estate-draft` | draft | R2 500 | 15% | Must never appear in the bidder app |
 | `autumn-jewellery-scheduled` | scheduled | R5 000 | 10% | Opens a few minutes after seeding |
@@ -137,7 +137,7 @@ Every auction including drafts, which bidders never see.
 | **Ends at** | The baseline close for **every lot in it**. Each lot copies this at creation. |
 | **Currency** | ISO code, defaults to ZAR. |
 | **Deposit** | What a bidder must have on account to bid here. Zero means ungated. |
-| **Buyer's premium** | A percentage added to the hammer price and charged to the winner. Stored as basis points — 1500 is 15%. Zero means none. |
+| **Commission** | A percentage added to the hammer price and charged to the winner. Stored as basis points — 1500 is 15%. Zero means none. |
 | **Anti-snipe window** | A bid inside this many seconds of a lot's close moves the close. Default 300. |
 | **Anti-snipe extension** | How much time that bid adds. Default 300. |
 | **Max extensions** | The cap. Past it, bids are still accepted right up to the deadline; they just stop moving it. |
@@ -169,13 +169,13 @@ Everything is editable while nothing has been bid on. After that:
 
 | Freezes when | Fields |
 |---|---|
-| **Any lot in the auction has a bid** | Currency, deposit, buyer's premium, anti-snipe window, anti-snipe extension, max extensions |
+| **Any lot in the auction has a bid** | Currency, deposit, commission, anti-snipe window, anti-snipe extension, max extensions |
 | **The auction goes live** | Starts at |
 
 Frozen inputs are disabled with the reason shown. If one slips through, the server refuses it and the
 form highlights that field.
 
-**Why the money fields freeze:** raising the premium after bidding starts changes what someone owes
+**Why the money fields freeze:** raising the commission after bidding starts changes what someone owes
 for a lot they have already bid on. Raising the deposit is worse — it retroactively disqualifies
 bidders who are currently winning, whose automatic bids keep running but who can no longer respond
 by hand. The escape hatch for either is a per-user ledger adjustment.
@@ -345,7 +345,7 @@ it still reads `live` while bids on it are already refused. Trust the countdown.
 place in this app: lot detail.
 
 **A winner is charged automatically** when their lot closes: the hammer price, and a separate
-buyer's premium line if the auction has one. You do not raise those by hand.
+commission line if the auction has one. You do not raise those by hand.
 
 ---
 
@@ -382,7 +382,7 @@ labelled as a correction rather than "reversal".
 
 **B3 — Open `+27820000020`'s ledger** (Kagiso Maseko, −R65 392,50).
 *Expect:* the balance stated as **owing**, in plain language. A `lot_won` charge and a separate
-`buyers_premium` charge, not one combined line.
+`commission` charge, not one combined line.
 
 **B4 — Record a deposit** of R1 000 for `+27820000026`.
 *Expect:* no plus/minus control anywhere. The balance moves immediately. Try to type a negative
@@ -411,8 +411,8 @@ screen and the bid gate must agree.
 ## C. Auctions
 
 **C1 — Create an auction.** Starts ~2 minutes out, ends ~20 minutes out. Set a **deposit of
-R3 000** and a **premium of 12,5%**.
-*Expect:* the premium field echoes what was stored in basis points (1250). After saving, reopen it
+R3 000** and a **commission of 12,5%**.
+*Expect:* the commission field echoes what was stored in basis points (1250). After saving, reopen it
 and confirm **both values persisted** — this specific round-trip has been broken before.
 
 **C2 — Try to publish it empty.**
@@ -430,7 +430,7 @@ and confirm **both values persisted** — this specific round-trip has been brok
 *Expect:* it goes `live` on its own within seconds. If not, the worker is not running.
 
 **C7 — Bid on one of its lots** from a bidder window with enough credit, then return here and try to
-change the deposit or the premium.
+change the deposit or the commission.
 *Expect:* both disabled with the reason. The other bidding rules too.
 
 **C8 — Change Ends at** to a couple of minutes further out.
@@ -466,7 +466,7 @@ shown for anyone.
 
 **D8 — Void the winning bid** on a `summer-antiques-ended` lot that sold.
 *Expect:* leader and price recalculate. **Then check the winner's ledger** — the `lot_won` and
-`buyers_premium` charges should have reversals against them.
+`commission` charges should have reversals against them.
 
 ## E. Live monitoring
 

@@ -177,7 +177,7 @@ still holds the previous default, so an operator who has started typing keeps
 what they typed. After a post it resets to their reference rather than to blank,
 since the next entry is usually theirs as well.
 
-**The buyer's premium is entered as a percentage and stored as basis points.**
+**The commission is entered as a percentage and stored as basis points.**
 The operator types 12.5 and the field says "Stored as 1250 basis points"
 underneath. Echoing the stored value is the point: a rate that quietly means a
 hundredth of what someone intended surfaces on an invoice, not in the form.
