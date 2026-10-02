@@ -10,6 +10,8 @@ import {
   auctionMutationSchema,
   bidSchema,
   confirmImageSchema,
+  depositEntryAdminSchema,
+  depositStatementSchema,
   incrementRuleSchema,
   lotAdminDetailSchema,
   lotAdminSummarySchema,
@@ -31,8 +33,11 @@ import {
   type CreateAuctionInput,
   type CreateIncrementRuleInput,
   type CreateLotInput,
+  type CreateDepositEntryInput,
   type CreateLedgerEntryInput,
   type CursorPage,
+  type DepositEntryAdmin,
+  type DepositStatement,
   type IncrementRule,
   type LedgerEntryAdmin,
   type LedgerStatement,
@@ -522,6 +527,65 @@ export function reverseLedgerEntry(
     method: "POST",
     body: { reason },
     schema: ledgerEntryAdminSchema,
+  });
+}
+
+/* ---------------------------------------------------------- deposit book */
+
+export interface DepositPageParams {
+  limit?: number;
+  offset?: number;
+}
+
+export interface DepositPage {
+  statement: DepositStatement;
+  hasMore: boolean;
+}
+
+/**
+ * What we HOLD for this user, and every movement that got it there. This is the
+ * number the bid gate checks — `getUserLedger` answers a different question.
+ *
+ * Like the ledger endpoint it does not send `X-Has-More`, so a full page is
+ * taken to mean "there may be more".
+ */
+export async function getUserDeposit(
+  userId: string,
+  params: DepositPageParams = {},
+  signal?: AbortSignal,
+): Promise<DepositPage> {
+  const limit = params.limit ?? 25;
+  const result = await apiRequestPaged(`/admin/users/${userId}/deposit`, {
+    schema: depositStatementSchema,
+    query: { limit, offset: params.offset ?? 0 },
+    signal,
+  });
+  return {
+    statement: result.data,
+    hasMore: result.hasMore || result.data.entries.length === limit,
+  };
+}
+
+export function createDepositEntry(
+  userId: string,
+  body: CreateDepositEntryInput,
+): Promise<DepositEntryAdmin> {
+  return apiRequest(`/admin/users/${userId}/deposit`, {
+    method: "POST",
+    body,
+    schema: depositEntryAdminSchema,
+  });
+}
+
+/** An entry can be reversed at most once; a second attempt is a 409. */
+export function reverseDepositEntry(
+  entryId: string,
+  reason: string,
+): Promise<DepositEntryAdmin> {
+  return apiRequest(`/admin/deposit/${entryId}/reverse`, {
+    method: "POST",
+    body: { reason },
+    schema: depositEntryAdminSchema,
   });
 }
 

@@ -50,7 +50,9 @@ The OTP is **`0000`** for every account.
 | `+27820000000` | superadmin — the only account that can change roles |
 | `+27820000001` | admin — everyday operator work |
 | `+27820000005/6/7` | more admins |
-| `+27820000002/3/4` | bidders with R20 000 credit each |
+| `+27820000002/3/4` | bidders holding R20 000 of deposit each |
+| `+27820000035` | owes money and **can** bid — a deposit is held |
+| `+27820000036` | in credit and **cannot** bid — no deposit lodged |
 
 Five auctions, one per lifecycle state:
 
@@ -83,31 +85,46 @@ behind.
 
 ---
 
-## Money: the account model
+## Money: two books, not one
 
-Every bidder has **one running balance**, not a wallet per auction. Positive means they are in
-credit, negative means they owe. Deposits and payments add credit; winning a lot subtracts.
+Every bidder has **two numbers**, and they answer different questions.
 
-R10 000 deposited then R12 000 won leaves them at **−R2 000** — they owe you R2 000. Or they pay the
-full R12 000 and keep R10 000 on account as the deposit for the next auction. There are no buckets
-and nothing to reconcile between them; there is only ever one number per person.
+**The deposit we hold** is the security deposit — the entry ticket. It is the *only* thing that
+decides whether someone may bid. It goes up when you record a deposit received and down when you
+pay one back out, and nothing else moves it.
 
-**Each auction states what a bidder must have on account to bid in it.** Bigger lots, bigger
-deposit. Someone with standing credit from a previous auction is automatically eligible for the next
-one — you do not approve anybody.
+**The balance** is the trading account: what they owe for what they won, or what they have paid in
+against it. Positive is credit, negative is owing.
 
-**Two rules that shape everything you can do here:**
+They are independent, and that is the point. Someone can **owe you money and still be allowed to
+bid**, because their deposit is untouched. Someone can be **in credit and still be refused**,
+because they have never lodged a deposit. Before October 2026 these were one number, and a winner's
+charges would eat the deposit that had admitted them to the sale.
 
-**The ledger is append-only.** Nothing is ever edited or deleted. A mistake is corrected by posting
-a **reversal** that points at the original, leaving both on the record. That is what lets a
-statement be reconciled against a bank statement. There is no edit button, and if a screen looks
-like it wants one, the answer is a reversal. An entry can be reversed once; a second attempt is
-refused.
+So: R10 000 deposit lodged, then R12 000 won, leaves the deposit at **R10 000** and the balance at
+**−R12 000**. They owe you R12 000; they can still bid. Return the deposit and they can no longer
+enter a *new* sale — though a sale they have already bid in stays open to them.
 
-**You enter a positive amount and the type decides the direction.** A deposit always adds credit; a
-refund always subtracts. There is no plus/minus control anywhere and a negative amount cannot be
-typed. `adjustment` is the one exception — it has no inherent direction, so it makes you choose
-credit or debit explicitly.
+**Each auction states what deposit a bidder must be holding to bid in it.** Bigger lots, bigger
+deposit. One deposit covers every auction whose requirement it meets; it is not ring-fenced per
+sale, and you approve nobody.
+
+**Three rules that shape everything you can do here:**
+
+**Both books are append-only.** Nothing is ever edited or deleted. A mistake is corrected by posting
+a **reversal** that points at the original, leaving both on the record. That is what lets either
+book be reconciled against a bank statement. There is no edit button, and if a screen looks like it
+wants one, the answer is a reversal. An entry can be reversed once; a second attempt is refused.
+
+**You enter a positive amount and the type decides the direction.** A deposit received always adds
+to what you hold; a refund always subtracts. On the ledger, a payment adds credit and a refund
+subtracts. There is no plus/minus control anywhere and a negative amount cannot be typed.
+`adjustment`, on the ledger only, is the one exception — it has no inherent direction, so it makes
+you choose credit or debit explicitly.
+
+**A deposit is never recorded on the ledger.** The ledger's old `Deposit` type is retired; it still
+appears on statements from before the change, labelled *Deposit (historic)*, but you cannot post a
+new one. Deposits have their own panel.
 
 ---
 
@@ -295,21 +312,30 @@ Doing nothing is also valid; the lot waits.
 
 ---
 
-## Users and their ledgers
+## Users, their deposits and their ledgers
 
 Search by phone or name, filter by status and role. Detail shows their activity — bids placed, lots
-bid on, lots currently winning, active sessions — and their **ledger**.
+bid on, lots currently winning, active sessions — then **the deposit we hold**, then their
+**ledger**.
 
-The balance is stated as a sentence: *"R2 000,00 owing"* or *"R10 000,00 in credit"*. Below it, the
-statement: what each entry was, when, the amount, the reference, and the balance after it.
+**The deposit panel comes first on purpose.** The question you arrive with is usually "why can this
+person not bid", and the answer is always here, never in the balance. It shows what is held and
+every movement that got it there.
 
-**Recording a payment** is the daily job. You check the bank, see a deposit, record it here: type,
-amount, reference, description. The balance moves immediately, and if that person was short for an
-auction, they become eligible the moment you save — no approval step.
+The balance below it is stated as a sentence: *"R2 000,00 owing"* or *"R10 000,00 in credit"*. Below
+that, the statement: what each entry was, when, the amount, the reference, and the balance after it.
 
-**Reversing an entry** is the correction path. It requires a reason, and the confirmation says
-plainly that the original stays on the record with a correcting entry added. An entry already
-reversed cannot be reversed again.
+**Recording a deposit** is what makes someone able to bid. You check the bank, see the deposit
+arrive, record it in the deposit panel: type, amount, reference, description. If that person was
+short for an auction they become eligible the moment you save — no approval step.
+
+**Recording a payment** against what someone owes is the other daily job, and it belongs on the
+ledger. It settles a debt; it does not make anyone eligible for anything.
+
+**Reversing an entry** is the correction path in both books. It requires a reason, and the
+confirmation says plainly that the original stays on the record with a correcting entry added. An
+entry already reversed cannot be reversed again. Reversing or refunding a deposit can take someone
+below an auction's requirement — the confirmation says so before you post it.
 
 **Suspend** ends every session immediately, including any open live connection, and blocks sign-in.
 Existing bids stand — financial records, not privileges. **Reactivate** lets them sign in again but
@@ -321,12 +347,16 @@ suspended.
 
 ## Participants
 
-On an auction: who can and cannot bid in it. Name, handle, balance, what this auction requires, the
-shortfall, and whether they have bid. It defaults to the **ineligible** list, because that is the
-working list — the people to chase.
+On an auction: who can and cannot bid in it. Name, handle, **the deposit held**, what this auction
+requires, the shortfall, the balance, and whether they have bid. It defaults to the **ineligible**
+list, because that is the working list — the people to chase.
 
-**There is no approval step and no participant table.** This is computed live from balances. Record
-someone's deposit and they become eligible immediately; that is the whole workflow.
+Deposit held comes before balance because only the first decides eligibility. The balance is there
+so you are not left guessing why someone who clearly owes money is marked as able to bid — they are,
+and that is correct.
+
+**There is no approval step and no participant table.** This is computed live from what is held.
+Record someone's deposit and they become eligible immediately; that is the whole workflow.
 
 ---
 
@@ -346,6 +376,13 @@ place in this app: lot detail.
 
 **A winner is charged automatically** when their lot closes: the hammer price, and a separate
 commission line if the auction has one. You do not raise those by hand.
+
+**Those charges do not touch the deposit.** A bidder can run up a large debt and still be eligible
+everywhere their deposit reaches. The only ways to make someone ineligible are to refund or reverse
+their deposit, or to raise an auction's requirement before anyone has bid in it.
+
+**Owing money and being unable to bid are unrelated.** Chase debts from Outstanding; unblock bidders
+from the deposit panel. A screen that mixes the two is wrong.
 
 ---
 
@@ -372,41 +409,65 @@ Re-seed first (`make seed-fresh`) so the time-sensitive auctions are fresh.
 
 ## B. Money — the newest code, test it hardest
 
-**B1 — Open `+27820000015`'s ledger** (Refilwe Molefe).
-*Expect:* deposit, payment, both adjustment directions and a refund. Charges and credits visually
-distinct. Running balance ending at R11 400.
+**B1 — Open `+27820000035`** (Owing Buyer).
+*Expect:* a deposit of R5 000 held, and a balance that is **owing**. The deposit panel is above the
+ledger. This person can bid. If anything on the screen suggests otherwise, that is the bug the two
+books exist to prevent.
 
-**B2 — Open `+27820000016`'s ledger** (Anele Jacobs).
+**B2 — Open `+27820000036`** (Credit Nodeposit).
+*Expect:* the mirror image. R9 000 in credit on the ledger, **no deposit held**, so they cannot bid
+in any auction that asks for one. Under the old single-balance rule they could.
+
+**B3 — Open `+27820000015`'s ledger** (Refilwe Molefe).
+*Expect:* a payment, both adjustment directions and a refund — and **no deposit line**, because
+deposits are no longer recorded here. Charges and credits visually distinct.
+
+**B4 — Open `+27820000016`'s ledger** (Anele Jacobs).
 *Expect:* a reversal shown as its own line — **not** netted away against the entry it corrects — and
 labelled as a correction rather than "reversal".
 
-**B3 — Open `+27820000020`'s ledger** (Kagiso Maseko, −R65 392,50).
-*Expect:* the balance stated as **owing**, in plain language. A `lot_won` charge and a separate
-`commission` charge, not one combined line.
+**B5 — Open `+27820000038`** (Miskeyed Deposit).
+*Expect:* the same correction behaviour on the **deposit** book: a reversed deposit, both lines
+visible, the held figure reflecting only the one that stands.
 
-**B4 — Record a deposit** of R1 000 for `+27820000026`.
-*Expect:* no plus/minus control anywhere. The balance moves immediately. Try to type a negative
-amount — it should be impossible, not merely rejected.
+**B6 — Open `+27820000020`** (Kagiso Maseko).
+*Expect:* a deposit held, and a balance deep in **owing**, stated in plain language. A `lot_won`
+charge and a separate `commission` charge, not one combined line. Note that winning all of that has
+not moved the deposit by a cent.
 
-**B5 — Reverse that deposit.**
-*Expect:* a reason required. Both entries remain visible afterwards; the balance returns.
+**B7 — Open `+27820000037`** (Closed Account).
+*Expect:* a deposit paid and then refunded, both on the record, nothing held now.
 
-**B6 — Reverse the same entry again.**
+**B8 — Record a deposit** of R1 000 for `+27820000026`.
+*Expect:* no plus/minus control anywhere. What is held moves immediately. Try to type a negative
+amount — it should be impossible, not merely rejected. The ledger panel below does **not** move.
+
+**B9 — Reverse that deposit.**
+*Expect:* a reason required, and a warning that lowering the deposit can make them ineligible for
+auctions they have not bid in. Both entries remain visible afterwards; the held figure returns.
+
+**B10 — Reverse the same entry again.**
 *Expect:* a clear message that it has already been reversed, not a generic error.
 
-**B7 — Post an adjustment.**
-*Expect:* it forces you to choose credit or debit. The other entry types do not offer that choice.
+**B11 — Try to record a deposit from the ledger panel.**
+*Expect:* there is no such option. `Deposit (historic)` is not offerable, and the only deposit
+control is in the deposit panel.
 
-**B8 — Open Participants on `autumn-jewellery-scheduled`** (R5 000 deposit).
-*Expect:* defaults to the ineligible list. `+27820000013` (exactly R5 000) is **eligible**;
-`+27820000014` (R4 999,99) is **not**, with a shortfall of one cent. That boundary is where this
-screen and the bid gate must agree.
+**B12 — Post an adjustment** on the ledger.
+*Expect:* it forces you to choose credit or debit. The other ledger types do not offer that choice,
+and the deposit panel has no direction control at all.
 
-**B9 — Record one cent for `+27820000014`, then re-check the list.**
+**B13 — Open Participants on `autumn-jewellery-scheduled`** (R5 000 deposit).
+*Expect:* defaults to the ineligible list. Deposit held is the column before Required.
+`+27820000013` (holding exactly R5 000) is **eligible**; `+27820000014` (R4 999,99) is **not**, with
+a shortfall of one cent. That boundary is where this screen and the bid gate must agree.
+`+27820000035`, who owes money, appears as **eligible**; `+27820000036`, who is in credit, does not.
+
+**B14 — Record one cent of deposit for `+27820000014`, then re-check the list.**
 *Expect:* they flip to eligible with no approval step.
 
-**B10 — Look for an "approve" control anywhere.**
-*Expect:* there isn't one. Eligibility follows from the balance.
+**B15 — Look for an "approve" control anywhere.**
+*Expect:* there isn't one. Eligibility follows from the deposit held.
 
 ## C. Auctions
 

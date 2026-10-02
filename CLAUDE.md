@@ -177,8 +177,8 @@ reversal. An entry can be reversed once; a second attempt is a 409 and should sa
 so plainly rather than surfacing a generic error.
 
 *Sign comes from the entry type.* `amount_minor` is posted as a positive
-magnitude and the backend applies the direction: `deposit` and `payment` add
-credit, `refund` and the charge types subtract. A negative amount is not
+magnitude and the backend applies the direction: `payment` adds credit,
+`refund` and the charge types subtract. A negative amount is not
 representable, so **never build a +/− toggle** — collect a positive amount and
 show the direction as a consequence of the type. `adjustment` is the sole
 exception: it has no inherent direction and must send
@@ -193,6 +193,29 @@ splits it into Charge and Credit columns; balances are stated as sentences —
 chasing the wrong person. `lib/format/ledger.ts` owns that wording and the
 entry-type labels (`lot_won` is "Lot won", `commission` is "Commission",
 `reversal` is "Correction").
+
+**There are TWO books, and the deposit one is not the ledger.** Security deposits
+left the ledger on 2026-10-02. `LedgerEntryType.deposit` is retired — the backend
+refuses a new one, so it is `postable: false` in `lib/format/ledger.ts` and
+labelled "Deposit (historic)"; the member stays only because rows posted before
+the split still have to render. Everything about a deposit now goes through
+`/admin/users/{id}/deposit` and `/admin/deposit/{id}/reverse`, with its own
+types, its own wording file (`lib/format/deposits.ts`) and its own panel
+(`components/users/UserDeposit.tsx`).
+
+Keep them separate. The duplication between the two format files and the two
+panels is deliberate, exactly as it is in the backend: one shared "money panel"
+with a type dropdown covering both books is how a deposit gets spent against an
+invoice. `describeHeld` deliberately does not say "in credit" — a held deposit is
+not credit, because it reduces nothing anyone owes.
+
+**Which number answers which question.** `held_minor` is what the bid gate reads
+and the only thing that makes someone eligible; `balance_minor` is what they owe
+for lots. Winning a lot charges the ledger and cannot move the deposit, so
+someone can owe money and still bid, and be in credit and still be refused. The
+user page shows the deposit panel **first** for that reason: "why can this person
+not bid" is the question an operator arrives with, and the balance is never the
+answer.
 
 **Outstanding is a query too, and settling is just a `payment`.**
 `GET /admin/outstanding` is computed from the ledger the same way participants
@@ -263,16 +286,22 @@ localhost link is broken rather than merely degraded.
 **Participants are a query, not a roster.** `GET /admin/auctions/{id}/participants`
 is computed on read — there is no participant table, no registration and no
 approval step, so **do not build an "approve" control**. Eligibility is the bid
-gate's own rule: the balance covers the deposit, **or** the person has already
-bid in that auction (voided bids included). It is earned once and not revoked,
-so recording a deposit is what makes someone *new* eligible, and a winner whose
-charges take them below the deposit keeps bidding. The screen defaults to the
-ineligible filter, which is exactly "never bid here and short", and every row
-links to that person's ledger.
+gate's own rule: **the deposit we hold** covers the requirement, **or** the person
+has already bid in that auction (voided bids included). It is earned once and not
+revoked, so recording a deposit is what makes someone *new* eligible. The screen
+defaults to the ineligible filter, which is exactly "never bid here and short of
+the deposit", and every row links to that person's account.
+
+The row shows `deposit_held_minor` **and** `balance_minor`, in that order. Both,
+because an operator reading either one alone draws the wrong conclusion about why
+a bid was refused; in that order, because only the first one decides it. Both come
+from the one grouped query the backend already runs — there is nothing to fetch
+per row.
 
 **An eligible row with a shortfall is correct, not a bug.** `admitted_by_bid`
 says a bid let them in; `has_bid` counts live bids only, so "voided only" is a
-real row. **Participants answers "can this person bid", never "who owes money".**
+real row. Since the split, the way an admitted bidder ends up short is a
+*refunded deposit* rather than a win. **Participants answers "can this person bid", never "who owes money".**
 That is `/outstanding`. Do not surface debt here: two screens answering one
 question is how they drift.
 

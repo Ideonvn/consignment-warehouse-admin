@@ -25,6 +25,7 @@ import { USER_ROLE_META } from "@/lib/format/status";
 import { isSuperadmin, useSessionStore } from "@/lib/auth";
 import { usePageTitle } from "@/lib/ui/use-page-title";
 import { userRoleSchema, type UserRole } from "@/types/api";
+import { UserDeposit } from "./UserDeposit";
 import { UserLedger } from "./UserLedger";
 
 export function UserDetail({ userId }: { userId: string }) {
@@ -189,7 +190,16 @@ export function UserDetail({ userId }: { userId: string }) {
         </DataPoint>
       </Panel>
 
-      <UserLedger userId={userId} paymentReference={user.payment_reference} />
+      {/* Deposit first, ledger second, and deliberately in that order: the
+          question an operator comes to this page with is "why can this person
+          not bid", and the answer is the deposit, never the balance. The two are
+          separate books since 2026-10-02 — a win charges the ledger and cannot
+          touch the deposit. */}
+      <UserDeposit userId={userId} paymentReference={user.payment_reference} />
+
+      <div className="mt-4">
+        <UserLedger userId={userId} paymentReference={user.payment_reference} />
+      </div>
 
       <Panel title="Account" className="mt-4">
         <dl className="grid gap-3 sm:grid-cols-2">

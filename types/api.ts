@@ -482,6 +482,11 @@ export type ChangeRoleInput = z.infer<typeof changeRoleSchema>;
  * One running ledger per user. Signed entries in minor units; the balance is
  * their sum. Positive is in credit, negative is owing. There are no buckets and
  * no transfers — one number per person.
+ *
+ * `deposit` is RETIRED: security deposits moved to their own book on 2026-10-02
+ * (see `depositEntryTypeSchema` below) and the backend refuses a new one. The
+ * member stays because rows posted before the split still come back and still
+ * have to render.
  */
 export const ledgerEntryTypeSchema = z.enum([
   "deposit",
@@ -544,6 +549,60 @@ export const createLedgerEntrySchema = z.object({
 });
 export type CreateLedgerEntryInput = z.infer<typeof createLedgerEntrySchema>;
 
+/* ----------------------------------------------------------- deposit book */
+
+/**
+ * The security-deposit book — a SECOND ledger, not a slice of the first.
+ *
+ * What the bid gate reads is `held_minor` here, never the account balance.
+ * Winning a lot charges the trading ledger and cannot move this number, which is
+ * the whole reason the backend split the two tables. Keep these types separate
+ * from the ledger ones for the same reason: one shared shape and a deposit can
+ * be rendered as something that offsets what is owed.
+ */
+export const depositEntryTypeSchema = z.enum(["paid", "refunded", "reversal"]);
+export type DepositEntryType = z.infer<typeof depositEntryTypeSchema>;
+
+export const depositEntryAdminSchema = z.object({
+  id: z.string(),
+  user_id: z.string(),
+  entry_type: depositEntryTypeSchema,
+  /** SIGNED on the way out; a positive MAGNITUDE on the way in. */
+  amount_minor: z.number(),
+  currency_code: z.string(),
+  description: z.string().nullable(),
+  reference: z.string().nullable(),
+  created_by_user_id: z.string().nullable(),
+  /** Set on a correction, pointing at the entry it cancels. */
+  reverses_entry_id: z.string().nullable(),
+  created_at: z.string(),
+  /** Accumulated oldest-first and continued across pages; null on a POST. */
+  held_after_minor: z.number().nullish(),
+});
+export type DepositEntryAdmin = z.infer<typeof depositEntryAdminSchema>;
+
+export const depositStatementSchema = z.object({
+  user_id: z.string(),
+  /** What we hold. Never negative in practice, and never reduced by a win. */
+  held_minor: z.number(),
+  currency_code: z.string(),
+  entries: z.array(depositEntryAdminSchema),
+});
+export type DepositStatement = z.infer<typeof depositStatementSchema>;
+
+/**
+ * `amount_minor` is a positive MAGNITUDE; the sign comes from `entry_type`.
+ * There is no direction field — neither `paid` nor `refunded` is ambiguous — and
+ * `reversal` is posted through its own route, so it is not offerable here.
+ */
+export const createDepositEntrySchema = z.object({
+  entry_type: z.enum(["paid", "refunded"]),
+  amount_minor: z.number().int().positive(),
+  description: z.string().max(2000).nullable().optional(),
+  reference: z.string().max(200).nullable().optional(),
+});
+export type CreateDepositEntryInput = z.infer<typeof createDepositEntrySchema>;
+
 /* ----------------------------------------------------------- participants */
 
 /** Computed on read — there is no participant table and no approval step. */
@@ -553,11 +612,14 @@ export const participantSchema = z.object({
   phone_e164: z.string(),
   first_name: z.string().nullable(),
   last_name: z.string().nullable(),
+  /** The TRADING account: what they owe or are owed for lots. Not what admits them. */
   balance_minor: z.number(),
+  /** The security deposit we hold. This is the number the bid gate compares. */
+  deposit_held_minor: z.number(),
   required_deposit_minor: z.number(),
-  /** Floored at zero by the backend. */
+  /** `required - deposit_held`, floored at zero by the backend. */
   shortfall_minor: z.number(),
-  /** Balance covers the deposit, OR `admitted_by_bid` — the bid gate's rule exactly. */
+  /** Held deposit covers the requirement, OR `admitted_by_bid` — the gate's rule exactly. */
   is_eligible: z.boolean(),
   /**
    * Has bid in this auction at all, voided bids included. Admission is earned

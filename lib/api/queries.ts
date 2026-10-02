@@ -131,6 +131,25 @@ export function useUserLedger(userId: string | undefined, page = 0) {
   });
 }
 
+/* ---------------------------------------------------------- deposit book */
+
+export const DEPOSIT_PAGE_SIZE = 25;
+
+export function useUserDeposit(userId: string | undefined, page = 0) {
+  const enabled = useAuthed();
+  return useQuery({
+    queryKey: queryKeys.deposit(userId ?? "", page),
+    queryFn: ({ signal }) =>
+      api.getUserDeposit(
+        userId!,
+        { limit: DEPOSIT_PAGE_SIZE, offset: page * DEPOSIT_PAGE_SIZE },
+        signal,
+      ),
+    enabled: enabled && Boolean(userId),
+    placeholderData: (previous) => previous,
+  });
+}
+
 export function useParticipants(
   auctionId: string | undefined,
   eligible: boolean | undefined,

@@ -18,17 +18,23 @@ type SortKey = "shortfall" | "name" | "balance";
 /**
  * Who can bid and who cannot — and only that.
  *
- * Computed on read by the backend with the bid gate's own rule: the balance
- * covers the deposit, OR the person has already bid in this auction (voided
- * bids included). Admission is earned once and not revoked, so a winner whose
- * charges take them below the deposit keeps bidding. There is no registration
- * or approval step, so there is deliberately no "approve" control here.
+ * Computed on read by the backend with the bid gate's own rule: the DEPOSIT WE
+ * HOLD covers this auction's requirement, OR the person has already bid in this
+ * auction (voided bids included). Admission is earned once and not revoked.
+ * There is no registration or approval step, so there is deliberately no
+ * "approve" control here.
  *
- * Defaults to the ineligible list, which is now exactly "never bid here and
- * short": the people a deposit would unblock. Every row links to the ledger.
+ * **The balance column answers a different question.** Since the deposit book was
+ * split out of the ledger, winning a lot cannot reduce what we hold — so someone
+ * can owe money and still be eligible, and someone can be in credit and still be
+ * refused. Both numbers are shown because an operator looking at one of them
+ * alone will reach the wrong conclusion about why a bid was refused.
  *
- * Not a debtors list. An eligible row can carry a shortfall, and that is money
- * owed, which is `/outstanding`'s question. Two screens answering it would drift.
+ * Defaults to the ineligible list, which is exactly "never bid here and short of
+ * the deposit": the people a deposit would unblock.
+ *
+ * Not a debtors list. What people owe is `/outstanding`'s question, and two
+ * screens answering it would drift.
  */
 export function AuctionParticipants({ auction }: { auction: AuctionAdmin }) {
   const [filter, setFilter] = useState<Filter>("ineligible");
@@ -77,12 +83,13 @@ export function AuctionParticipants({ auction }: { auction: AuctionAdmin }) {
   return (
     <div className="flex flex-col gap-3">
       <Note tone="info">
-        Someone can bid once their balance covers this auction&apos;s{" "}
-        <strong>{formatMoney(auction.deposit_amount_minor, currency)}</strong>{" "}
-        deposit, and after their first bid here they can keep bidding for the
-        rest of the sale, even if a win takes them below it. There is nothing to
-        approve: record a deposit and someone new can bid straight away. What
-        people owe is on{" "}
+        Someone can bid once the deposit we hold for them covers this
+        auction&apos;s{" "}
+        <strong>{formatMoney(auction.deposit_amount_minor, currency)}</strong>,
+        and after their first bid here they can keep bidding for the rest of the
+        sale. There is nothing to approve: record a deposit and someone new can
+        bid straight away. The balance column is a separate book — winning a lot
+        charges it and never touches the deposit. What people owe is on{" "}
         <Link
           href="/outstanding"
           className="font-medium text-accent-strong underline underline-offset-2"
@@ -141,7 +148,7 @@ export function AuctionParticipants({ auction }: { auction: AuctionAdmin }) {
       </div>
 
       {isPending ? (
-        <TableSkeleton columns={6} />
+        <TableSkeleton columns={7} />
       ) : rows.length === 0 ? (
         <EmptyState
           title={
@@ -151,7 +158,7 @@ export function AuctionParticipants({ auction }: { auction: AuctionAdmin }) {
           }
           description={
             filter === "ineligible"
-              ? "Everyone here either covers the deposit or has already bid in this auction."
+              ? "Everyone here either holds the deposit this auction asks for or has already bid in it."
               : "Bidders appear here once they have an account."
           }
           action={
@@ -175,10 +182,13 @@ export function AuctionParticipants({ auction }: { auction: AuctionAdmin }) {
                     Phone
                   </th>
                   <th className="px-2.5 py-1.5 text-right text-xs font-semibold text-text-muted">
-                    Balance
+                    Deposit held
                   </th>
                   <th className="px-2.5 py-1.5 text-right text-xs font-semibold text-text-muted">
                     Required
+                  </th>
+                  <th className="px-2.5 py-1.5 text-right text-xs font-semibold text-text-muted">
+                    Balance
                   </th>
                   <th className="px-2.5 py-1.5 text-right text-xs font-semibold text-text-muted">
                     Short by
@@ -215,7 +225,7 @@ function ParticipantRow({
   const name = [p.first_name, p.last_name].filter(Boolean).join(" ");
   const balance = describeBalance(p.balance_minor, currency);
   // The one case where "can bid" and "short of the deposit" disagree: a bid
-  // admitted them, and a win (usually) has since taken them below it.
+  // admitted them, and their deposit has since been refunded.
   const admittedWhileShort = p.is_eligible && p.shortfall_minor > 0;
 
   return (
@@ -233,6 +243,15 @@ function ParticipantRow({
       </td>
       {/* Shown because the operator phones these people; never in a URL. */}
       <td className="tnum px-2.5 py-1.5 font-mono text-xs">{p.phone_e164}</td>
+      {/* What the gate actually reads, so it leads. */}
+      <td className="tnum px-2.5 py-1.5 text-right font-medium">
+        {formatMoney(p.deposit_held_minor, currency)}
+      </td>
+      <td className="tnum px-2.5 py-1.5 text-right text-text-muted">
+        {formatMoney(p.required_deposit_minor, currency)}
+      </td>
+      {/* The trading account. Owing money does not block a bid, so it is never
+          inked as a problem here — that is Outstanding's job. */}
       <td
         className={cn(
           "tnum px-2.5 py-1.5 text-right",
@@ -240,9 +259,6 @@ function ParticipantRow({
         )}
       >
         {formatMoney(p.balance_minor, currency)}
-      </td>
-      <td className="tnum px-2.5 py-1.5 text-right text-text-muted">
-        {formatMoney(p.required_deposit_minor, currency)}
       </td>
       {/* Warning ink only where the shortfall is what stops them bidding. For an
           admitted bidder it is a fact, not a blocker; what they owe is chased
@@ -296,7 +312,7 @@ function ParticipantRow({
       <td className="px-2.5 py-1.5 text-right">
         <Link href={`/users/${p.user_id}`}>
           <Button size="sm" variant="secondary">
-            Ledger
+            Account
           </Button>
         </Link>
       </td>

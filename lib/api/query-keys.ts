@@ -21,6 +21,11 @@ export const queryKeys = {
   ledger: (userId: string, page: number) =>
     ["user", userId, "ledger", page] as const,
 
+  /** The security-deposit book — a different number from the ledger's balance. */
+  depositRoot: (userId: string) => ["user", userId, "deposit"] as const,
+  deposit: (userId: string, page: number) =>
+    ["user", userId, "deposit", page] as const,
+
   participants: (auctionId: string, eligible: boolean | undefined) =>
     ["auction", auctionId, "participants", eligible ?? "all"] as const,
 

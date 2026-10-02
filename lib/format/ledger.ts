@@ -1,5 +1,8 @@
 /**
- * Human wording for the credit ledger.
+ * Human wording for the TRADING ledger — what someone owes for what they won.
+ *
+ * Security deposits are a different book entirely; see `./deposits.ts`. Nothing
+ * here can admit anyone to a sale.
  *
  * Two rules from the backend shape everything here:
  *  - the ledger is APPEND-ONLY: a mistake is corrected by posting a reversal
@@ -21,10 +24,13 @@ export interface LedgerEntryMeta {
 
 export const LEDGER_ENTRY_META: Record<LedgerEntryType, LedgerEntryMeta> = {
   deposit: {
-    label: "Deposit",
+    label: "Deposit (historic)",
     effect: "credit",
-    hint: "Money received to bid against. Adds to their credit.",
-    postable: true,
+    // Not postable since 2026-10-02: deposits are their own book, and the
+    // backend refuses a new one here. Kept so rows from before the split still
+    // render with a name rather than an enum value.
+    hint: "Retired. Security deposits are recorded on the deposit book instead.",
+    postable: false,
   },
   payment: {
     label: "Payment",
