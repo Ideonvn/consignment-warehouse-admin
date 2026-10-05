@@ -142,6 +142,20 @@ Every destructive dialog states plainly what happens to bidders.
 than letting them click into a 403. The same applies anywhere else a permission
 is knowable in advance.
 
+**A `deleted` account shows no Reactivate button**, which is that same rule
+applied to a state that only became reachable on 2026-10-02, when users could
+first close their own accounts (`DELETE /auth/me`). `status !== "active"` is no
+longer the same as "suspended", and the backend refuses to reactivate a deleted
+account — so the control is absent rather than present and failing, and a note
+says what survived: name, contact details and addresses gone; bids, ledger and
+deposit entries kept as financial records; `payment_reference` kept so a
+historical bank line can still be matched.
+
+**There is deliberately no admin delete control**, and the backend has no route
+for one. An admin-initiated deletion is a different act — a POPIA request
+arriving by email — and deserves its own handling rather than a button that
+reuses the self-service path.
+
 **`reserve_price_minor` and `phone_e164` are admin-only data.** The reserve is
 exposed by exactly one endpoint (`GET /admin/lots/{id}`) plus the admin lot
 lists. Never log either. **Never put a phone number in a URL** — that is why the

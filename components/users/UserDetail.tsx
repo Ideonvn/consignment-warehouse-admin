@@ -144,14 +144,24 @@ export function UserDetail({ userId }: { userId: string }) {
               >
                 Suspend
               </Button>
-            ) : (
+            ) : user.status === "suspended" ? (
               <Button variant="primary" onClick={() => setShowReactivate(true)}>
                 Reactivate
               </Button>
-            )}
+            ) : null}
           </>
         }
       />
+
+      {user.status === "deleted" && (
+        <Note tone="warning" className="mb-3">
+          This account was closed by the user. It cannot be reactivated — the backend refuses it,
+          so there is no control here rather than one that fails. Their name, contact details and
+          saved addresses are gone; their bids and ledger entries remain, because those are
+          financial records, and their payment reference is kept so a historical bank line can
+          still be matched.
+        </Note>
+      )}
 
       {isSelf && (
         <Note tone="info" className="mb-3">
