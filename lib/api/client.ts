@@ -59,6 +59,19 @@ export async function apiRequestPaged<T>(
   };
 }
 
+/**
+ * Raw bytes, for the invoice PDF. Goes through the same `send`, so the bearer
+ * token and the single-flight 401 refresh behave exactly as they do everywhere
+ * else — a download is an authenticated request like any other.
+ */
+export async function apiRequestBlob(
+  path: string,
+  options: Omit<HttpOptions, "token" | "blob"> = {},
+): Promise<Blob> {
+  const { data } = await send(path, { ...options, blob: true }, true);
+  return data as Blob;
+}
+
 /** For 204 responses. */
 export async function apiRequestVoid(
   path: string,

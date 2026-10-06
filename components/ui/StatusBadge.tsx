@@ -2,6 +2,7 @@
 
 import {
   AUCTION_STATUS_META,
+  INVOICE_STATUS_META,
   LOT_PROGRESS_META,
   LOT_STATUS_META,
   USER_ROLE_META,
@@ -11,6 +12,7 @@ import {
 } from "@/lib/format/status";
 import type {
   AuctionStatus,
+  InvoiceStatus,
   LotProgress,
   LotStatus,
   UserRole,
@@ -107,5 +109,22 @@ export function RoleBadge({
 }) {
   const meta = USER_ROLE_META[role];
   if (!meta) return <span className="text-text-muted">{role}</span>;
+  return <Badge meta={meta} className={className} />;
+}
+
+/**
+ * Invoice status, from the same map and the same six tones as every other
+ * badge. The value is computed by the backend on every read — see
+ * `INVOICE_STATUS_META` — so this renders it and never works it out.
+ */
+export function InvoiceStatusBadge({
+  status,
+  className,
+}: {
+  status: InvoiceStatus;
+  className?: string;
+}) {
+  const meta = INVOICE_STATUS_META[status];
+  if (!meta) return <span className="text-text-muted">{status}</span>;
   return <Badge meta={meta} className={className} />;
 }

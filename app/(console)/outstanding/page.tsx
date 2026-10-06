@@ -206,6 +206,9 @@ export default function OutstandingPage() {
           // A payment can make someone eligible for an auction they have not
           // bid in yet.
           void client.invalidateQueries({ queryKey: ["auction"] });
+          // And if it was allocated, invoices on pages nobody can predict from
+          // here have changed their derived status.
+          void client.invalidateQueries({ queryKey: queryKeys.invoicesRoot });
         }}
       />
     </>

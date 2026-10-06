@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import {
   AuctionIcon,
   DecisionIcon,
+  InvoiceIcon,
   LotIcon,
   MoneyIcon,
   MonitorIcon,
@@ -78,6 +79,16 @@ export function Sidebar({
       match: (p) => p.startsWith("/outstanding"),
       badge: outstanding,
       badgeLabel: `${outstanding} owing money`,
+    },
+    {
+      // No badge, deliberately. "Who owes money" is Outstanding's question and
+      // it is already counted there; a second count of the same debt in a
+      // different unit is two numbers that disagree for a reason nobody can
+      // see from the sidebar.
+      href: "/invoices",
+      label: "Invoices",
+      icon: InvoiceIcon,
+      match: (p) => p.startsWith("/invoices"),
     },
     {
       href: "/users",

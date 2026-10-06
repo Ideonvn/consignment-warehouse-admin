@@ -25,6 +25,7 @@ import { USER_ROLE_META } from "@/lib/format/status";
 import { isSuperadmin, useSessionStore } from "@/lib/auth";
 import { usePageTitle } from "@/lib/ui/use-page-title";
 import { userRoleSchema, type UserRole } from "@/types/api";
+import { UserInvoices } from "@/components/invoices/UserInvoices";
 import { UserDeposit } from "./UserDeposit";
 import { UserLedger } from "./UserLedger";
 
@@ -211,6 +212,16 @@ export function UserDetail({ userId }: { userId: string }) {
         <UserLedger userId={userId} paymentReference={user.payment_reference} />
       </div>
 
+      {/* Invoices last. The BALANCE is the authoritative answer to "what do
+          they owe" — an invoice is a document covering a subset of the charges
+          behind it, so the two can legitimately disagree: an unpaid invoice
+          alongside an account in credit just means a payment landed on account
+          and nobody allocated it. Reading deposit → balance → invoices is the
+          order the questions arrive in. */}
+      <div className="mt-4">
+        <UserInvoices userId={userId} />
+      </div>
+
       <Panel title="Account" className="mt-4">
         <dl className="grid gap-3 sm:grid-cols-2">
           <div>
@@ -233,7 +244,20 @@ export function UserDetail({ userId }: { userId: string }) {
             </dd>
           </div>
           <div>
-            {/* What the operator quotes when this person asks how to pay. */}
+            {/* Free text and never validated — a passport number is a legitimate
+                answer, and a uniqueness rule on something a bidder types would
+                turn one person's typo into another's lockout. It is here because
+                the invoice design prints it; nothing gates on it. */}
+            <dt className="text-xs text-text-muted">ID / passport number</dt>
+            <dd className="font-mono text-sm">
+              {user.id_number ?? (
+                <span className="font-sans text-text-muted">not given</span>
+              )}
+            </dd>
+          </div>
+          <div>
+            {/* What the operator quotes when this person asks how to pay money
+                ONTO their account. An invoice asks for its own number instead. */}
             <dt className="text-xs text-text-muted">Payment reference</dt>
             <dd className="font-mono text-sm">
               {user.payment_reference ?? (

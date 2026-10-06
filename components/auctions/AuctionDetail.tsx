@@ -30,6 +30,7 @@ import { AuctionEditForm } from "./AuctionEditForm";
 import { AuctionImage } from "./AuctionImage";
 import { AuctionVisibility } from "./AuctionVisibility";
 import { AuctionParticipants } from "./AuctionParticipants";
+import { AuctionInvoices } from "@/components/invoices/AuctionInvoices";
 import { IncrementRulesEditor } from "./IncrementRulesEditor";
 import { LotsTab } from "@/components/lots/LotsTab";
 
@@ -37,6 +38,7 @@ const TABS = [
   { id: "overview", label: "Overview" },
   { id: "lots", label: "Lots" },
   { id: "participants", label: "Participants" },
+  { id: "invoices", label: "Invoices" },
   { id: "increments", label: "Increments" },
 ];
 
@@ -188,6 +190,8 @@ export function AuctionDetail({ auctionId }: { auctionId: string }) {
       {tab === "lots" && <LotsTab auction={auction} />}
 
       {tab === "participants" && <AuctionParticipants auction={auction} />}
+
+      {tab === "invoices" && <AuctionInvoices auction={auction} />}
 
       {tab === "increments" && (
         <Panel

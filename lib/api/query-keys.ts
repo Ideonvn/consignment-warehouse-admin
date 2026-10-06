@@ -1,5 +1,9 @@
 /** Central query keys so invalidation after a mutation is never a guess. */
-import type { ListAuctionsParams, ListUsersParams } from "./endpoints";
+import type {
+  ListAuctionsParams,
+  ListInvoicesParams,
+  ListUsersParams,
+} from "./endpoints";
 
 export const queryKeys = {
   me: ["me"] as const,
@@ -28,6 +32,15 @@ export const queryKeys = {
 
   participants: (auctionId: string, eligible: boolean | undefined) =>
     ["auction", auctionId, "participants", eligible ?? "all"] as const,
+
+  /**
+   * Issued invoices. `invoicesRoot` is what a posted payment invalidates — an
+   * allocation changes the derived status of an invoice on a page nobody can
+   * predict, so the whole subtree goes rather than one key.
+   */
+  invoicesRoot: ["invoices"] as const,
+  invoices: (params: ListInvoicesParams = {}) => ["invoices", params] as const,
+  invoice: (invoiceId: string) => ["invoice", invoiceId] as const,
 
   /** Everyone who owes money, one page at a time, plus the count for the nav. */
   outstandingRoot: ["outstanding"] as const,

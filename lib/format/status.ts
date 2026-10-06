@@ -4,6 +4,7 @@
  */
 import type {
   AuctionStatus,
+  InvoiceStatus,
   LotProgress,
   LotStatus,
   UserRole,
@@ -124,3 +125,39 @@ export const OPEN_LOT_STATUSES: LotStatus[] = ["scheduled", "live"];
 export function isLotDecisionPending(status: LotStatus): boolean {
   return status === "ended_reserve_not_met";
 }
+
+/**
+ * Invoice status, which is **derived server-side and never stored** —
+ * `invoicing.status_of` computes it from the allocations and the clock on every
+ * read, in one precedence order: paid > overdue > part_paid > unpaid.
+ *
+ * ⚠️ Never re-derive it in a component. The `?unpaid=` filter on the list is
+ * applied to the same derivation, so a screen that computed its own would
+ * eventually disagree with the rows it was handed.
+ *
+ * `paid` is `success` and `overdue` is `warning` rather than `danger`: an
+ * overdue invoice is a thing to chase, not a failure, and `danger` is reserved
+ * here for cancelled and suspended.
+ */
+export const INVOICE_STATUS_META: Record<InvoiceStatus, StatusMeta> = {
+  unpaid: {
+    label: "Unpaid",
+    tone: "neutral",
+    hint: "Nothing allocated to it yet, and not yet due",
+  },
+  part_paid: {
+    label: "Part paid",
+    tone: "info",
+    hint: "Some of a payment has been allocated, but not the full amount",
+  },
+  paid: {
+    label: "Paid",
+    tone: "success",
+    hint: "Settled in full — paid wins over overdue, so a late settlement is still settled",
+  },
+  overdue: {
+    label: "Overdue",
+    tone: "warning",
+    hint: "Past its due date with money still on it",
+  },
+};

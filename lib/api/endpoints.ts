@@ -13,6 +13,8 @@ import {
   depositEntryAdminSchema,
   depositStatementSchema,
   incrementRuleSchema,
+  invoiceAdminDetailSchema,
+  invoiceAdminListSchema,
   lotAdminDetailSchema,
   lotAdminSummarySchema,
   ledgerEntryAdminSchema,
@@ -39,6 +41,8 @@ import {
   type DepositEntryAdmin,
   type DepositStatement,
   type IncrementRule,
+  type InvoiceAdmin,
+  type InvoiceAdminDetail,
   type LedgerEntryAdmin,
   type LedgerStatement,
   type LotAdminDetail,
@@ -59,7 +63,12 @@ import {
   type VoidBidResult,
   type WsTicket,
 } from "@/types/api";
-import { apiRequest, apiRequestPaged, apiRequestVoid } from "./client";
+import {
+  apiRequest,
+  apiRequestBlob,
+  apiRequestPaged,
+  apiRequestVoid,
+} from "./client";
 
 const auctionListSchema = z.array(auctionAdminSchema);
 const lotListSchema = z.array(lotAdminSummarySchema);
@@ -617,6 +626,88 @@ export async function listOutstanding(
     signal,
   });
   return { items: result.data, hasMore: result.hasMore };
+}
+
+/* ---------------------------------------------------------------- invoices */
+
+export interface ListInvoicesParams {
+  auctionId?: string;
+  userId?: string;
+  /** Only invoices with money still outstanding on them. */
+  unpaid?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+export interface InvoicesPage {
+  items: InvoiceAdmin[];
+  hasMore: boolean;
+}
+
+/**
+ * Invoices, newest first.
+ *
+ * ⚠️ `unpaid` is applied by the backend AFTER the allocations are summed, not as
+ * a `WHERE` — there is no status column. So `limit`/`offset` page the unfiltered
+ * set and the filter then thins the page: a page can come back shorter than the
+ * limit with more behind it, and `X-Has-More` describes the query rather than
+ * the rows. Do not compute "N invoices unpaid" from a page length.
+ */
+export async function listInvoices(
+  params: ListInvoicesParams = {},
+  signal?: AbortSignal,
+): Promise<InvoicesPage> {
+  const result = await apiRequestPaged("/admin/invoices", {
+    schema: invoiceAdminListSchema,
+    query: {
+      auction_id: params.auctionId,
+      user_id: params.userId,
+      unpaid: params.unpaid ? true : undefined,
+      limit: params.limit ?? 50,
+      offset: params.offset ?? 0,
+    },
+    signal,
+  });
+  return { items: result.data, hasMore: result.hasMore };
+}
+
+export function getInvoice(
+  invoiceId: string,
+  signal?: AbortSignal,
+): Promise<InvoiceAdminDetail> {
+  return apiRequest(`/admin/invoices/${invoiceId}`, {
+    schema: invoiceAdminDetailSchema,
+    signal,
+  });
+}
+
+/**
+ * The document itself. Streamed through the API — see `apiRequestBlob`.
+ *
+ * The same bytes the bidder downloads: one renderer, one stored object, so an
+ * operator can never be looking at a different document from the customer.
+ */
+export function getInvoicePdf(invoiceId: string): Promise<Blob> {
+  return apiRequestBlob(`/admin/invoices/${invoiceId}/pdf`);
+}
+
+/**
+ * Bill whatever is still unbilled in this sale.
+ *
+ * The worker already does this when the auction ends, so this is for the
+ * leftovers — commonly a reserve accepted days later, which raises a charge
+ * after the sale was invoiced. **Safe to press repeatedly**: it bills unbilled
+ * charges, so a second press returns an empty list rather than a duplicate
+ * document, and the UI should say so rather than guarding the button.
+ */
+export function issueOutstandingInvoices(
+  auctionId: string,
+): Promise<InvoiceAdmin[]> {
+  return apiRequest(`/admin/auctions/${auctionId}/invoice`, {
+    method: "POST",
+    body: {},
+    schema: invoiceAdminListSchema,
+  });
 }
 
 /* ----------------------------------------------------------- participants */

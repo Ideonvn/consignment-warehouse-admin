@@ -9,6 +9,12 @@ import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { Note } from "@/components/ui/Feedback";
+import {
+  AllocateToInvoices,
+  allocatedTotal,
+  toAllocationList,
+  type AllocationDraft,
+} from "@/components/invoices/AllocateToInvoices";
 import { createLedgerEntry } from "@/lib/api/endpoints";
 import { errorMessage } from "@/lib/api/errors";
 import { formatRelative } from "@/lib/format/datetime";
@@ -23,6 +29,13 @@ import type { Outstanding } from "@/types/api";
  * ordinary `payment` entry through the same write path as every other entry, so
  * the settlement carries its own amount and reference and can be reversed like
  * anything else.
+ *
+ * **Allocating is offered here as well as on the ledger screen**, and it has to
+ * be: this is where an operator records most payments, so an allocation control
+ * only on the other screen would mean invoices stay unpaid while balances
+ * settle — the two numbers drifting apart for a reason nothing on screen
+ * explains. The control is the same component, so the two cannot diverge, and
+ * it disappears entirely for someone with no open invoices.
  *
  * The amount and reference are **editable**. A bank line rarely matches the
  * balance to the cent — someone pays a round number, or pays for two things at
@@ -41,6 +54,7 @@ export function MarkPaidDialog({
 }) {
   const [amount, setAmount] = useState<number | null>(null);
   const [reference, setReference] = useState("");
+  const [allocations, setAllocations] = useState<AllocationDraft>({});
   const [error, setError] = useState<string | null>(null);
 
   // Reconciled during render so each opening starts from that person's figures
@@ -51,6 +65,7 @@ export function MarkPaidDialog({
     setLastRowId(rowId);
     setAmount(row?.amount_owing_minor ?? null);
     setReference(row?.payment_reference ?? "");
+    setAllocations({});
     setError(null);
   }
 
@@ -66,6 +81,7 @@ export function MarkPaidDialog({
         amount_minor: amount!,
         reference: reference.trim() || null,
         description: null,
+        allocations: toAllocationList(allocations),
       }),
     onSuccess: () => {
       toast.success(
@@ -80,6 +96,15 @@ export function MarkPaidDialog({
   function confirm() {
     if (amount === null || amount <= 0) {
       setError("Enter an amount greater than zero");
+      return;
+    }
+    // The server refuses an over-allocation rather than trimming it, and rolls
+    // the payment back with it. Caught here so the operator fixes a number
+    // rather than losing the entry.
+    if (allocatedTotal(allocations) > amount) {
+      setError(
+        "That allocates more than the payment is worth. Reduce an allocation, or raise the amount.",
+      );
       return;
     }
     setError(null);
@@ -164,6 +189,14 @@ export function MarkPaidDialog({
               onChange={(event) => setReference(event.target.value)}
             />
           </Field>
+
+          <AllocateToInvoices
+            userId={row.user_id}
+            currency={currency}
+            paymentMinor={amount ?? 0}
+            value={allocations}
+            onChange={setAllocations}
+          />
 
           {after && (
             <Note tone={overpaying ? "warning" : "info"}>

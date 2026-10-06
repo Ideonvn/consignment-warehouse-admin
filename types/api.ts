@@ -463,6 +463,14 @@ export const adminUserSchema = z.object({
 export type AdminUser = z.infer<typeof adminUserSchema>;
 
 export const adminUserDetailSchema = adminUserSchema.extend({
+  /**
+   * The bidder's ID or passport number, on the DETAIL shape only — the same
+   * reason the list carries no address. It names a person, and a table of them
+   * is a worse thing to leave on a screen than one record someone opened
+   * deliberately. Free text: a passport number is a legitimate answer, so it is
+   * neither unique nor checksum-validated anywhere.
+   */
+  id_number: z.string().nullable(),
   bid_count: z.number(),
   lots_bid_on: z.number(),
   lots_currently_winning: z.number(),
@@ -546,6 +554,24 @@ export const createLedgerEntrySchema = z.object({
   direction: ledgerDirectionSchema.optional(),
   description: z.string().max(2000).nullable().optional(),
   reference: z.string().max(200).nullable().optional(),
+  /**
+   * Which invoices this payment settles, and by how much. Omitted or empty means
+   * on-account credit, which is ordinary rather than an incomplete request.
+   *
+   * A LIST, because one bank transfer legitimately settles two invoices. Only a
+   * `payment` may carry these — the backend refuses them on any other type, so
+   * the UI must not offer the control for one. Over-allocating is refused in
+   * both directions (more than the payment, or more than the invoice still
+   * owes) and takes the payment down with it: nothing is clamped.
+   */
+  allocations: z
+    .array(
+      z.object({
+        invoice_id: z.string(),
+        amount_minor: z.number().int().positive(),
+      }),
+    )
+    .optional(),
 });
 export type CreateLedgerEntryInput = z.infer<typeof createLedgerEntrySchema>;
 
@@ -602,6 +628,100 @@ export const createDepositEntrySchema = z.object({
   reference: z.string().max(200).nullable().optional(),
 });
 export type CreateDepositEntryInput = z.infer<typeof createDepositEntrySchema>;
+
+/* ---------------------------------------------------------------- invoices */
+
+/**
+ * **Derived, never stored.** The backend has no `status` column on `invoices` —
+ * `invoicing.status_of` computes this from the allocations and the clock on every
+ * read, so the list, the detail and the `unpaid` filter cannot disagree.
+ *
+ * Precedence, which the UI must not re-derive: paid > overdue > part_paid > unpaid.
+ * An invoice settled late is **settled**; showing it as overdue forever puts it on
+ * a chasing list nobody can clear.
+ */
+export const invoiceStatusSchema = z.enum([
+  "unpaid",
+  "part_paid",
+  "paid",
+  "overdue",
+]);
+export type InvoiceStatus = z.infer<typeof invoiceStatusSchema>;
+
+/**
+ * One printed line, frozen at issue.
+ *
+ * Amounts are **positive magnitudes**. The same charges are negative on the
+ * ledger because they reduce a balance; on a document they are amounts owed, and
+ * a minus sign there reads as a credit.
+ */
+export const invoiceLineAdminSchema = z.object({
+  position: z.number(),
+  description: z.string(),
+  lot_id: z.string().nullable(),
+  net_minor: z.number(),
+  tax_minor: z.number(),
+  gross_minor: z.number(),
+  tax_rate_bps: z.number(),
+});
+export type InvoiceLineAdmin = z.infer<typeof invoiceLineAdminSchema>;
+
+/** How much of one payment settled this invoice. */
+export const invoiceAllocationSchema = z.object({
+  invoice_id: z.string(),
+  invoice_number: z.string(),
+  amount_minor: z.number(),
+});
+export type InvoiceAllocation = z.infer<typeof invoiceAllocationSchema>;
+
+/**
+ * An issued invoice. **Immutable** — there is no edit, no delete and no
+ * regenerate route, and the UI must not offer one. A mistake is corrected by
+ * reversing the charge, and the next invoice bills what is actually owed.
+ *
+ * `vat_number` and `tax_rate_bps` are SNAPSHOTS taken at issue, not the current
+ * settings: a VAT number that appeared on a document cannot be unprinted by
+ * editing configuration. Render these, never anything from a settings endpoint.
+ */
+export const invoiceAdminSchema = z.object({
+  id: z.string(),
+  number: z.string(),
+  user_id: z.string(),
+  auction_id: z.string(),
+  issued_at: z.string(),
+  due_at: z.string(),
+  currency_code: z.string(),
+  subtotal_minor: z.number(),
+  tax_minor: z.number(),
+  total_minor: z.number(),
+  /** Empty means we were not a registered vendor at issue — "Invoice", not "Tax Invoice". */
+  vat_number: z.string(),
+  tax_rate_bps: z.number(),
+  bill_to_name: z.string().nullable(),
+  bill_to_reference: z.string().nullable(),
+  /** Summed from the allocations, excluding any whose payment has been reversed. */
+  paid_minor: z.number(),
+  status: invoiceStatusSchema,
+});
+export type InvoiceAdmin = z.infer<typeof invoiceAdminSchema>;
+export const invoiceAdminListSchema = z.array(invoiceAdminSchema);
+
+export const invoiceAdminDetailSchema = invoiceAdminSchema.extend({
+  /**
+   * What the DOCUMENT prints in its customer block, snapshotted at issue — not
+   * what the user record says today. An operator fielding "this invoice has my
+   * old number on it" needs the frozen value; the live one is a click away on
+   * the user page.
+   */
+  bill_to_first_name: z.string().nullable(),
+  bill_to_last_name: z.string().nullable(),
+  bill_to_id_number: z.string().nullable(),
+  bill_to_phone: z.string().nullable(),
+  lines: z.array(invoiceLineAdminSchema),
+  /** Why it reads as paid — without these the only check is reconciling by eye. */
+  allocations: z.array(invoiceAllocationSchema),
+});
+export type InvoiceAdminDetail = z.infer<typeof invoiceAdminDetailSchema>;
 
 /* ----------------------------------------------------------- participants */
 

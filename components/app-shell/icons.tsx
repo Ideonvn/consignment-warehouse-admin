@@ -122,3 +122,19 @@ export function MoneyIcon(props: IconProps) {
     </Svg>
   );
 }
+
+/**
+ * A sheet of paper with ruled lines: invoices are documents, deliberately
+ * distinct from the banknote the outstanding list uses. They answer different
+ * questions — "what did we bill" against "who owes us".
+ */
+export function InvoiceIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M3.5 1.5h6l3 3v10h-9z" />
+      <path d="M9.5 1.5v3h3" />
+      <path d="M5.5 8h5" />
+      <path d="M5.5 10.5h5" />
+    </Svg>
+  );
+}

@@ -10,6 +10,12 @@ import { Field } from "@/components/ui/Field";
 import { Input, Select } from "@/components/ui/Input";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { Panel } from "@/components/ui/Panel";
+import {
+  AllocateToInvoices,
+  allocatedTotal,
+  toAllocationList,
+  type AllocationDraft,
+} from "@/components/invoices/AllocateToInvoices";
 import { createLedgerEntry, reverseLedgerEntry } from "@/lib/api/endpoints";
 import { errorMessage, isApiError } from "@/lib/api/errors";
 import { LEDGER_PAGE_SIZE, useUserLedger } from "@/lib/api/queries";
@@ -69,6 +75,10 @@ export function UserLedger({
     // Eligibility for anyone who has not bid in an auction yet follows the
     // balance, so any participants list is stale.
     void client.invalidateQueries({ queryKey: ["auction"] });
+    // An allocation — or a REVERSED payment that had one — changes the derived
+    // status of an invoice on a page nobody can predict from here, so the whole
+    // subtree goes rather than one key.
+    void client.invalidateQueries({ queryKey: queryKeys.invoicesRoot });
   }
 
   const reverse = useMutation({
@@ -328,8 +338,13 @@ function RecordEntry({
   paymentReference?: string | null;
   onPosted: () => void;
 }) {
-  const [type, setType] = useState<LedgerEntryType>("deposit");
+  // `payment`, NOT `deposit`. The deposit type was retired on 2026-10-02 and is
+  // `postable: false`, so it is absent from the Select below — leaving it as the
+  // initial state showed "Payment" in a dropdown that would post a `deposit` and
+  // be refused with a 422 by a backend that no longer accepts one.
+  const [type, setType] = useState<LedgerEntryType>("payment");
   const [amount, setAmount] = useState<number | null>(null);
+  const [allocations, setAllocations] = useState<AllocationDraft>({});
   const [direction, setDirection] = useState<LedgerDirection | "">("");
   const [reference, setReference] = useState(paymentReference ?? "");
   const [description, setDescription] = useState("");
@@ -346,6 +361,7 @@ function RecordEntry({
 
   const meta = LEDGER_ENTRY_META[type];
   const needsDirection = meta.effect === "either";
+  const isPayment = type === "payment";
 
   const post = useMutation({
     mutationFn: () =>
@@ -356,6 +372,9 @@ function RecordEntry({
         direction: needsDirection ? (direction as LedgerDirection) : undefined,
         reference: reference.trim() || null,
         description: description.trim() || null,
+        // Only a payment may carry these; the backend refuses them on any
+        // other type, so the control is not even rendered for one.
+        allocations: isPayment ? toAllocationList(allocations) : undefined,
       }),
     onSuccess: (entry) => {
       onPosted();
@@ -364,6 +383,7 @@ function RecordEntry({
       setReference(paymentReference ?? "");
       setDescription("");
       setDirection("");
+      setAllocations({});
       setError(null);
       toast.success(
         `${LEDGER_ENTRY_META[entry.entry_type].label} of ${formatMoney(
@@ -383,6 +403,15 @@ function RecordEntry({
     }
     if (needsDirection && !direction) {
       setError("Say whether this adjustment adds credit or takes it off");
+      return;
+    }
+    // Mirrors the server, which refuses an over-allocation rather than
+    // trimming it — and rolls the payment back with it. Caught here so the
+    // operator fixes a number rather than losing the whole entry.
+    if (isPayment && allocatedTotal(allocations) > amount) {
+      setError(
+        "That allocates more than the payment is worth. Reduce an allocation, or raise the amount.",
+      );
       return;
     }
     setError(null);
@@ -411,6 +440,10 @@ function RecordEntry({
               onChange={(event) => {
                 setType(event.target.value as LedgerEntryType);
                 setDirection("");
+                // Switching off `payment` makes any draft allocation
+                // unsendable, so it is dropped rather than silently retained
+                // and reappearing if the operator switches back.
+                setAllocations({});
                 setError(null);
               }}
             >
@@ -485,6 +518,16 @@ function RecordEntry({
             onChange={(event) => setDescription(event.target.value)}
           />
         </Field>
+
+        {isPayment && (
+          <AllocateToInvoices
+            userId={userId}
+            currency={currency}
+            paymentMinor={amount ?? 0}
+            value={allocations}
+            onChange={setAllocations}
+          />
+        )}
 
         {effect && <Note tone="info">{effect}</Note>}
 

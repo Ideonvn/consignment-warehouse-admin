@@ -210,6 +210,84 @@ export function useOutstandingCount(): number {
   return data?.items.length ?? 0;
 }
 
+/* --------------------------------------------------------------- invoices */
+
+export const INVOICES_PAGE_SIZE = 50;
+
+/**
+ * Issued invoices, newest first.
+ *
+ * ⚠️ With `unpaid` on, the backend filters AFTER summing the allocations, so a
+ * page can come back shorter than `INVOICES_PAGE_SIZE` with more behind it. The
+ * screen must page on `hasMore`, never on "did I get a full page".
+ */
+export function useInvoices(
+  params: Omit<api.ListInvoicesParams, "limit" | "offset"> = {},
+  page = 0,
+) {
+  const enabled = useAuthed();
+  const full: api.ListInvoicesParams = {
+    ...params,
+    limit: INVOICES_PAGE_SIZE,
+    offset: page * INVOICES_PAGE_SIZE,
+  };
+  // Explicit generic: `placeholderData: (previous) => previous` makes the
+  // inferred result `{}` here, exactly as it does on the decisions query.
+  return useQuery<api.InvoicesPage>({
+    queryKey: queryKeys.invoices(full),
+    enabled,
+    staleTime: 30_000,
+    placeholderData: (previous) => previous,
+    queryFn: ({ signal }) => api.listInvoices(full, signal),
+  });
+}
+
+export function useInvoice(invoiceId: string | undefined) {
+  const enabled = useAuthed();
+  return useQuery({
+    queryKey: queryKeys.invoice(invoiceId ?? ""),
+    queryFn: ({ signal }) => api.getInvoice(invoiceId!, signal),
+    enabled: enabled && Boolean(invoiceId),
+  });
+}
+
+/**
+ * One bidder's invoices that still have money on them — what the allocation
+ * control on the payment form offers.
+ *
+ * Deliberately **not paged**: an operator allocating a bank line is choosing
+ * among this person's open documents, and a second page of them would mean
+ * something has gone badly wrong operationally rather than that the control
+ * needs pagination.
+ */
+export function useUnpaidInvoicesFor(userId: string | undefined) {
+  const enabled = useAuthed();
+  return useQuery<api.InvoicesPage>({
+    queryKey: queryKeys.invoices({ userId, unpaid: true, limit: 200 }),
+    enabled: enabled && Boolean(userId),
+    staleTime: 15_000,
+    queryFn: ({ signal }) =>
+      api.listInvoices({ userId, unpaid: true, limit: 200 }, signal),
+  });
+}
+
+/**
+ * Everything a posted payment or a fresh issue could have changed.
+ *
+ * The whole `invoices` subtree goes rather than one key: an allocation changes
+ * the DERIVED status of an invoice sitting on a page nobody can predict from
+ * here, and the `unpaid` filter means a row can leave a list it was on.
+ */
+export function useInvoiceInvalidation() {
+  const client = useQueryClient();
+  return (invoiceId?: string) => {
+    void client.invalidateQueries({ queryKey: queryKeys.invoicesRoot });
+    if (invoiceId) {
+      void client.invalidateQueries({ queryKey: queryKeys.invoice(invoiceId) });
+    }
+  };
+}
+
 /* -------------------------------------------------------------- decisions */
 
 export const DECISIONS_PAGE_SIZE = 50;

@@ -254,6 +254,87 @@ it is shown on the user detail screen because it is what an operator quotes when
 someone asks how to pay. It arrives after the form mounts, so the default is
 reconciled during render and only while the field is untouched.
 
+**Since 2026-10-05 an INVOICE asks for its own number instead**, so one bank line maps to one
+document and the allocation is unambiguous. The per-person reference stays and is still the
+right default here, because there is no invoice to name when someone pays a deposit in or tops
+up on account — which is most of the money. The rule is the surface, not the person: *paying a
+document* quotes the document, *paying onto an account* quotes the account. The invoice detail
+screen therefore labels the snapshot **"Account reference at issue"** rather than "Payment
+reference"; it is kept because payments made before the change quote it.
+
+**The user detail screen shows `id_number`, and the user list deliberately does not.** It is
+on the backend's detail shape only, the same way the list carries no address: a table of
+identity numbers is a worse thing to leave on a screen than one record an operator opened
+deliberately. It is free text — no checksum, no uniqueness, because a passport number is a
+legitimate answer — so render it as given and never offer to validate it.
+
+**Invoices are documents, and nothing on this portal edits one.** Added 2026-10-05. An invoice
+bills ledger entries that already exist and never recalculates them — a document that recomputed
+its total from the auction's current `commission_bps` would disagree with the ledger the day
+someone edited that rate. So there is no edit, no delete and no regenerate route, and no screen
+offers one: a mistake is corrected on the ledger, and the next invoice bills what is actually
+owed. The only write is **issuing**, on the auction's own Invoices tab.
+
+**The invoice detail shows what the DOCUMENT printed, not what the user record says today.**
+`bill_to_first_name`, `bill_to_last_name`, `bill_to_id_number` and `bill_to_phone` are snapshots
+taken at issue, labelled "(printed)" on screen for exactly that reason. An operator fielding
+"this invoice has my old number on it" needs the frozen value; the live one is one click away
+under "Billed to". They are on the **detail** shape only — the invoice list carries neither the
+ID number nor the phone.
+
+**`status` is not a column — do not render it from anything but the server.** Paid, part-paid and
+overdue are derived from the allocations and the clock in one backend function, in one precedence
+order: paid beats overdue beats part-paid. The `?unpaid=` filter is applied to that same
+derivation, so a screen that worked the status out for itself would eventually disagree with the
+rows it was handed. `INVOICE_STATUS_META` in `lib/format/status.ts` is labels and tones only, and
+`InvoiceStatusBadge` renders it — the usual rule that `StatusBadge` is the single status→colour
+map applies here too.
+
+**One consequence of that derivation worth knowing: `?unpaid=true` filters AFTER the page is
+read.** The server sums the allocations, then drops the settled rows, so a page can come back
+shorter than the limit with more behind it and `X-Has-More` describes the query rather than the
+rows. Page on `hasMore`, never on "did I get a full page", and the list says so on screen.
+
+**Line amounts are positive magnitudes; the same charges are negative on the ledger.** There they
+reduce a balance, here they are amounts owed, and a minus sign on a document reads as a credit.
+`vat_number` and `tax_rate_bps` are snapshots taken at issue, never today's settings — a VAT
+number that appeared on a document someone holds cannot be unprinted by editing configuration.
+
+**An invoice becomes paid by ALLOCATING a payment, and there is no other way.** Settling is still
+an ordinary `payment` entry through `POST /admin/users/{id}/ledger` — one write path, as before —
+and `allocations` rides along on that same request, applied in the same transaction. A payment
+that committed while its allocation did not would read as on-account credit against an invoice
+still showing unpaid, and nothing on screen would distinguish that from an allocation the operator
+forgot. A payment with no allocations is **on-account credit**, which is ordinary rather than an
+incomplete request, so nothing in the control is required.
+
+`components/invoices/AllocateToInvoices.tsx` is one component used by **both** payment forms — the
+ledger screen and the outstanding list's Mark-paid dialog — and that is not tidiness. Most payments
+are recorded from Outstanding, so allocation only on the ledger screen would mean invoices stay
+unpaid while balances settle, the two numbers drifting apart for a reason nothing on screen
+explains. It disappears entirely for someone with no open invoices.
+
+**Over-allocating is refused, never clamped, in both directions** — more than the payment is
+worth, or more than the invoice still owes — and the refusal takes the payment down with it. Both
+forms check before submitting, so the operator fixes a number rather than losing the entry.
+
+⚠️ **There is no un-allocate and no allocation reversal, and none should be built.** An allocation
+is not money: the ledger entry it points at is untouched and immutable, so an allocation whose
+entry has been reversed simply stops counting. **Reversing the payment IS the correction**, which
+the ledger already allows exactly once. That is why the table needs no second way to be wrong.
+
+**"Bill anything outstanding" is safe to press repeatedly**, which is why it has no confirmation.
+The worker already issues invoices when a sale ends, in the same transaction; the button is for
+the leftovers, commonly a reserve accepted days later. It bills *unbilled* charges, so a second
+press creates nothing and says so — and a unique index on the billed ledger entry makes that true
+even if two operators press it at once.
+
+**The PDF is streamed through the API, never a presigned URL**, so the download cannot be an
+`<a href>`: `apiRequestBlob` carries the bearer token through the same single-flight refresh as
+every other call. A presigned link is a bearer capability that survives being pasted into a chat,
+and an invoice names a person and what they owe. The operator and the bidder share one renderer
+and one stored object, so there can be no operator-only version of a document.
+
 **Visibility is not a status, and not a frozen field.** `auctions.visibility` is
 `public` or `private`, default private, and it is orthogonal to
 `AuctionStatus` — a `live` auction may be either. Two consequences, both
