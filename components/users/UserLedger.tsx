@@ -38,38 +38,18 @@ import type { LedgerDirection, LedgerEntryAdmin, LedgerEntryType } from "@/types
  * corrected by posting a reversal that points at the original, and both stay on
  * the record — that is what makes the statement reconcilable against a bank.
  */
-export function UserLedger({
-  userId,
-  paymentReference,
-}: {
-  userId: string;
-  /** Defaulted into the reference field so it is not typed off a bank statement. */
-  paymentReference?: string | null;
-}) {
+/**
+ * Everything a ledger mutation invalidates, in one place.
+ *
+ * Shared because the balance and the statement are now rendered on **different
+ * tabs** of the user screen, and a correction posted on one has to move the
+ * other. Two copies of this list is how an invalidation comes to be added to
+ * one of them only, which shows up as a figure that is right on one tab and
+ * stale on the next.
+ */
+function useLedgerInvalidate(userId: string) {
   const client = useQueryClient();
-  const [page, setPage] = useState(0);
-  const { data, isPending, error, refetch, isFetching } = useUserLedger(
-    userId,
-    page,
-  );
-  const [reversing, setReversing] = useState<LedgerEntryAdmin | null>(null);
-
-  const statement = data?.statement;
-  const currency = statement?.currency_code ?? "ZAR";
-  const balance = statement?.balance_minor ?? 0;
-  const entries = statement?.entries ?? [];
-  const summary = describeBalance(balance, currency);
-
-  // A correction names what it undoes, so the entries on this page tell us which
-  // of them can still be reversed. Only this page, though — the correction for
-  // an older entry may sit on a later one, which is why the 409 stays handled.
-  const reversedIds = new Set(
-    entries
-      .map((entry) => entry.reverses_entry_id)
-      .filter((id): id is string => Boolean(id)),
-  );
-
-  function invalidate() {
+  return () => {
     void client.invalidateQueries({ queryKey: queryKeys.ledgerRoot(userId) });
     void client.invalidateQueries({ queryKey: queryKeys.user(userId) });
     // Eligibility for anyone who has not bid in an auction yet follows the
@@ -79,16 +59,38 @@ export function UserLedger({
     // status of an invoice on a page nobody can predict from here, so the whole
     // subtree goes rather than one key.
     void client.invalidateQueries({ queryKey: queryKeys.invoicesRoot });
-  }
+  };
+}
 
-  const reverse = useMutation({
-    mutationFn: ({ entryId, reason }: { entryId: string; reason: string }) =>
-      reverseLedgerEntry(entryId, reason),
-    onSuccess: () => {
-      invalidate();
-      toast.success("Correction posted. Both entries stay on the statement.");
-    },
-  });
+/**
+ * The balance and the form that moves it — the Account tab.
+ *
+ * **Split from the statement on 2026-10-07**, when the user screen went to
+ * tabs. They were one component because they were one column; they are two now
+ * because the statement is long, consulted rarely, and was pushing the thing an
+ * operator actually came to do off the bottom of the screen. Both halves read
+ * `useUserLedger`, so this costs no extra request: page 0 is the same query key
+ * the statement's first page uses.
+ *
+ * `RecordEntry` stays here rather than on the statement, and the invoice
+ * allocation control comes with it — recording a payment and saying which
+ * documents it settles is **one request**, so they cannot be on separate tabs.
+ */
+export function UserLedgerAccount({
+  userId,
+  paymentReference,
+}: {
+  userId: string;
+  /** Defaulted into the reference field so it is not typed off a bank statement. */
+  paymentReference?: string | null;
+}) {
+  const { data, isPending, error, refetch } = useUserLedger(userId);
+  const invalidate = useLedgerInvalidate(userId);
+
+  const statement = data?.statement;
+  const currency = statement?.currency_code ?? "ZAR";
+  const balance = statement?.balance_minor ?? 0;
+  const summary = describeBalance(balance, currency);
 
   if (error) {
     return (
@@ -128,7 +130,62 @@ export function UserLedger({
         paymentReference={paymentReference}
         onPosted={invalidate}
       />
+    </div>
+  );
+}
 
+/**
+ * The statement — its own tab since 2026-10-07.
+ *
+ * It owns the paging and the reversal, because both belong to the history
+ * rather than to the balance. Reversing from here still invalidates everything
+ * a posting does, through the shared hook above, so the balance on the Account
+ * tab is correct the moment the operator switches back to it.
+ */
+export function UserStatement({ userId }: { userId: string }) {
+  const [page, setPage] = useState(0);
+  const { data, isPending, error, refetch, isFetching } = useUserLedger(
+    userId,
+    page,
+  );
+  const [reversing, setReversing] = useState<LedgerEntryAdmin | null>(null);
+  const invalidate = useLedgerInvalidate(userId);
+
+  const statement = data?.statement;
+  const currency = statement?.currency_code ?? "ZAR";
+  const balance = statement?.balance_minor ?? 0;
+  const entries = statement?.entries ?? [];
+
+  // A correction names what it undoes, so the entries on this page tell us which
+  // of them can still be reversed. Only this page, though — the correction for
+  // an older entry may sit on a later one, which is why the 409 stays handled.
+  const reversedIds = new Set(
+    entries
+      .map((entry) => entry.reverses_entry_id)
+      .filter((id): id is string => Boolean(id)),
+  );
+
+  const reverse = useMutation({
+    mutationFn: ({ entryId, reason }: { entryId: string; reason: string }) =>
+      reverseLedgerEntry(entryId, reason),
+    onSuccess: () => {
+      invalidate();
+      toast.success("Correction posted. Both entries stay on the statement.");
+    },
+  });
+
+  if (error) {
+    return (
+      <ErrorState
+        title="Could not load the ledger"
+        message={errorMessage(error)}
+        onRetry={() => void refetch()}
+      />
+    );
+  }
+
+  return (
+    <>
       <Panel
         title="Statement"
         description="Newest first. Nothing here is ever edited or removed — a mistake is corrected with a reversal."
@@ -142,7 +199,7 @@ export function UserLedger({
           <div className="p-3">
             <EmptyState
               title="No entries yet"
-              description="Record a deposit above and it will appear here."
+              description="Record money on the Account tab and it will appear here."
             />
           </div>
         ) : (
@@ -314,7 +371,7 @@ export function UserLedger({
           }
         }}
       />
-    </div>
+    </>
   );
 }
 

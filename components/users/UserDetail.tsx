@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
@@ -12,26 +13,69 @@ import { Select, Textarea } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DataPoint, Panel } from "@/components/ui/Panel";
 import { RoleBadge, StatusBadge } from "@/components/ui/StatusBadge";
+import { Tabs } from "@/components/ui/Tabs";
 import {
   changeUserRole,
   reactivateUser,
   suspendUser,
 } from "@/lib/api/endpoints";
 import { errorMessage, isApiError } from "@/lib/api/errors";
-import { useUser } from "@/lib/api/queries";
+import { cn } from "@/lib/utils";
+import { useUser, useUserDeposit, useUserLedger } from "@/lib/api/queries";
 import { queryKeys } from "@/lib/api/query-keys";
 import { formatDateTime, formatRelative } from "@/lib/format/datetime";
+import { describeHeld } from "@/lib/format/deposits";
+import { describeBalance } from "@/lib/format/ledger";
 import { USER_ROLE_META } from "@/lib/format/status";
 import { isSuperadmin, useSessionStore } from "@/lib/auth";
 import { usePageTitle } from "@/lib/ui/use-page-title";
 import { userRoleSchema, type UserRole } from "@/types/api";
 import { UserInvoices } from "@/components/invoices/UserInvoices";
 import { UserDeposit } from "./UserDeposit";
-import { UserLedger } from "./UserLedger";
+import { UserLedgerAccount, UserStatement } from "./UserLedger";
+
+/**
+ * **Account is the default tab and carries no `?tab=`**, matching the auction
+ * screen's convention so a pasted link is the shortest thing that works.
+ *
+ * Order is the order the questions arrive in: what do they owe and what are we
+ * doing about it, then the deposit book, then the long history, then who they
+ * are. The two figures those first two tabs are *about* stay in the header, so
+ * nothing that decides anything is behind a click.
+ */
+const TABS = [
+  { id: "account", label: "Account" },
+  { id: "deposit", label: "Deposit" },
+  { id: "statement", label: "Statement" },
+  { id: "details", label: "Details" },
+];
 
 export function UserDetail({ userId }: { userId: string }) {
+  const router = useRouter();
+  const params = useSearchParams();
+  const requested = params.get("tab");
+  // An unknown `?tab=` falls back rather than rendering nothing: a stale
+  // bookmark should land somewhere useful, not on a blank screen.
+  const tab = TABS.some((t) => t.id === requested) ? requested! : "account";
+
+  function setTab(next: string) {
+    router.replace(`/users/${userId}${next === "account" ? "" : `?tab=${next}`}`);
+  }
   const client = useQueryClient();
   const { data: user, isPending, error, refetch } = useUser(userId);
+  // The two figures in the header. Page 0 of each book, which is the same query
+  // key the Deposit and Account tabs ask for — so this adds no request, and
+  // their mutations already invalidate by prefix.
+  const deposit = useUserDeposit(userId);
+  const ledger = useUserLedger(userId);
+  const held = describeHeld(
+    deposit.data?.statement?.held_minor ?? 0,
+    deposit.data?.statement?.currency_code ?? "ZAR",
+  );
+  const standing = describeBalance(
+    ledger.data?.statement?.balance_minor ?? 0,
+    ledger.data?.statement?.currency_code ?? "ZAR",
+  );
   const me = useSessionStore((s) => s.user);
   usePageTitle(
     user
@@ -179,10 +223,51 @@ export function UserDetail({ userId }: { userId: string }) {
         </Note>
       )}
 
+      {/* Six figures, always visible, money first — and the money being here
+          rather than inside a tab is the whole reason this screen can have tabs
+          at all. "Why can this person not bid" is the question an operator
+          arrives with, the deposit is the only answer, and a number that needs
+          a click is a number that gets guessed at instead. The balance sits
+          beside it for the opposite reason: the two are separate books and
+          reading either one alone draws the wrong conclusion.
+
+          Both come from the same query keys the Deposit and Account tabs use
+          (page 0), so TanStack serves one request for each however many of them
+          are mounted — and the panels' mutations invalidate by prefix, so
+          recording money updates these without any wiring here. */}
       <Panel
         className="mb-3"
-        bodyClassName="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+        bodyClassName="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
       >
+        <DataPoint label="Deposit held">
+          {deposit.isPending ? (
+            <Skeleton className="h-7 w-28" />
+          ) : (
+            <span
+              className={cn(
+                "tnum text-lg font-semibold",
+                held.tone === "none" && "text-text-muted",
+              )}
+            >
+              {held.text}
+            </span>
+          )}
+        </DataPoint>
+        <DataPoint label="Balance">
+          {ledger.isPending ? (
+            <Skeleton className="h-7 w-28" />
+          ) : (
+            <span
+              className={cn(
+                "tnum text-lg font-semibold",
+                standing.tone === "owing" && "text-danger-ink",
+                standing.tone === "credit" && "text-success-ink",
+              )}
+            >
+              {standing.text}
+            </span>
+          )}
+        </DataPoint>
         <DataPoint label="Bids placed">
           <span className="tnum text-lg font-semibold">{user.bid_count}</span>
         </DataPoint>
@@ -201,94 +286,102 @@ export function UserDetail({ userId }: { userId: string }) {
         </DataPoint>
       </Panel>
 
-      {/* Deposit first, ledger second, and deliberately in that order: the
-          question an operator comes to this page with is "why can this person
-          not bid", and the answer is the deposit, never the balance. The two are
-          separate books since 2026-10-02 — a win charges the ledger and cannot
-          touch the deposit. */}
-      <UserDeposit userId={userId} paymentReference={user.payment_reference} />
+      {/* Tabs from here down, the same component and the same URL convention as
+          the auction screen: the default tab carries no `?tab=`, so an operator
+          can paste a link straight to someone's statement.
 
-      <div className="mt-4">
-        <UserLedger userId={userId} paymentReference={user.payment_reference} />
-      </div>
+          Switching tabs UNMOUNTS the panel, which is why the two figures above
+          have their own queries rather than reading one off a mounted child. */}
+      <Tabs tabs={TABS} active={tab} onChange={setTab} className="mb-3" />
 
-      {/* Invoices last. The BALANCE is the authoritative answer to "what do
-          they owe" — an invoice is a document covering a subset of the charges
-          behind it, so the two can legitimately disagree: an unpaid invoice
-          alongside an account in credit just means a payment landed on account
-          and nobody allocated it. Reading deposit → balance → invoices is the
-          order the questions arrive in. */}
-      <div className="mt-4">
-        <UserInvoices userId={userId} />
-      </div>
+      {tab === "account" && (
+        <div className="flex flex-col gap-4">
+          {/* Record money and the invoice list stay together: an allocation
+              rides on the same POST as the payment, so splitting them would put
+              half an operation on another tab. */}
+          <UserLedgerAccount
+            userId={userId}
+            paymentReference={user.payment_reference}
+          />
+          <UserInvoices userId={userId} />
+        </div>
+      )}
 
-      <Panel title="Account" className="mt-4">
-        <dl className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <dt className="text-xs text-text-muted">Phone</dt>
-            <dd className="tnum font-mono text-sm">{user.phone_e164}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-text-muted">Email</dt>
-            <dd className="text-sm">
-              {user.email ? (
-                <>
-                  <span className="break-all">{user.email}</span>
-                  <EmailDelivery user={user} />
-                </>
-              ) : (
-                <span className="text-text-muted">
-                  none — SMS only
-                </span>
-              )}
-            </dd>
-          </div>
-          <div>
-            {/* Free text and never validated — a passport number is a legitimate
-                answer, and a uniqueness rule on something a bidder types would
-                turn one person's typo into another's lockout. It is here because
-                the invoice design prints it; nothing gates on it. */}
-            <dt className="text-xs text-text-muted">ID / passport number</dt>
-            <dd className="font-mono text-sm">
-              {user.id_number ?? (
-                <span className="font-sans text-text-muted">not given</span>
-              )}
-            </dd>
-          </div>
-          <div>
-            {/* What the operator quotes when this person asks how to pay money
-                ONTO their account. An invoice asks for its own number instead. */}
-            <dt className="text-xs text-text-muted">Payment reference</dt>
-            <dd className="font-mono text-sm">
-              {user.payment_reference ?? (
-                <span className="font-sans text-text-muted">
-                  none — issued when they first owe money
-                </span>
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-text-muted">Phone verified</dt>
-            <dd className="text-sm">{user.is_phone_verified ? "Yes" : "No"}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-text-muted">Last login</dt>
-            <dd className="tnum text-sm">
-              {user.last_login_at
-                ? `${formatDateTime(user.last_login_at)} (${formatRelative(user.last_login_at)})`
-                : "never"}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-text-muted">Joined</dt>
-            <dd className="tnum text-sm">{formatDateTime(user.created_at)}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-text-muted">User ID</dt>
-            <dd className="font-mono text-xs">{user.id}</dd>
-          </div>
-        </dl>
-      </Panel>
+      {tab === "deposit" && (
+        <UserDeposit userId={userId} paymentReference={user.payment_reference} />
+      )}
+
+      {tab === "statement" && <UserStatement userId={userId} />}
+
+      {tab === "details" && (
+        <Panel title="Details">
+          <dl className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs text-text-muted">Phone</dt>
+              <dd className="tnum font-mono text-sm">{user.phone_e164}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-text-muted">Email</dt>
+              <dd className="text-sm">
+                {user.email ? (
+                  <>
+                    <span className="break-all">{user.email}</span>
+                    <EmailDelivery user={user} />
+                  </>
+                ) : (
+                  <span className="text-text-muted">
+                    none — SMS only
+                  </span>
+                )}
+              </dd>
+            </div>
+            <div>
+              {/* Free text and never validated — a passport number is a legitimate
+                  answer, and a uniqueness rule on something a bidder types would
+                  turn one person's typo into another's lockout. It is here because
+                  the invoice design prints it; nothing gates on it. */}
+              <dt className="text-xs text-text-muted">ID / passport number</dt>
+              <dd className="font-mono text-sm">
+                {user.id_number ?? (
+                  <span className="font-sans text-text-muted">not given</span>
+                )}
+              </dd>
+            </div>
+            <div>
+              {/* What the operator quotes when this person asks how to pay money
+                  ONTO their account. An invoice asks for its own number instead. */}
+              <dt className="text-xs text-text-muted">Payment reference</dt>
+              <dd className="font-mono text-sm">
+                {user.payment_reference ?? (
+                  <span className="font-sans text-text-muted">
+                    none — issued when they first owe money
+                  </span>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-text-muted">Phone verified</dt>
+              <dd className="text-sm">{user.is_phone_verified ? "Yes" : "No"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-text-muted">Last login</dt>
+              <dd className="tnum text-sm">
+                {user.last_login_at
+                  ? `${formatDateTime(user.last_login_at)} (${formatRelative(user.last_login_at)})`
+                  : "never"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-text-muted">Joined</dt>
+              <dd className="tnum text-sm">{formatDateTime(user.created_at)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-text-muted">User ID</dt>
+              <dd className="font-mono text-xs">{user.id}</dd>
+            </div>
+          </dl>
+        </Panel>
+      )}
 
       <ConfirmDialog
         open={showSuspend}

@@ -226,10 +226,34 @@ not credit, because it reduces nothing anyone owes.
 **Which number answers which question.** `held_minor` is what the bid gate reads
 and the only thing that makes someone eligible; `balance_minor` is what they owe
 for lots. Winning a lot charges the ledger and cannot move the deposit, so
-someone can owe money and still bid, and be in credit and still be refused. The
-user page shows the deposit panel **first** for that reason: "why can this person
-not bid" is the question an operator arrives with, and the balance is never the
-answer.
+someone can owe money and still bid, and be in credit and still be refused.
+
+**Both figures are in the user page's header strip, and that is what lets the
+rest of the screen be tabbed** (2026-10-07). The deposit *panel* used to be
+first, on the reasoning that "why can this person not bid" is the question an
+operator arrives with and the balance is never the answer. That reasoning is
+unchanged — but it was an argument against hiding the *figure*, not against
+tabbing the work, and the screen had grown to five stacked panels. So the
+numbers never move and the panels do:
+
+| Tab | Holds |
+| --- | --- |
+| **Account** (default, no `?tab=`) | balance, Record money, invoices |
+| **Deposit** | held, Record a deposit, movements |
+| **Statement** | the ledger history and its reversals |
+| **Details** | phone, email, ID number, payment reference, sessions |
+
+**Record money and the invoice list are on one tab deliberately.** An allocation
+rides on the same `POST /admin/users/{id}/ledger` as the payment, so they are one
+request; splitting them would put half an operation on another tab.
+
+`UserLedger.tsx` exports **two** components for this — `UserLedgerAccount` and
+`UserStatement` — sharing one `useLedgerInvalidate` hook. Two copies of that
+invalidation list is how a correction comes to move one tab's figure and not the
+other's. Both read `useUserLedger`, and the header reads page 0 of each book, so
+the same query key serves however many are mounted; switching tabs unmounts a
+panel, which is exactly why the header figures have their own queries rather than
+reading off a mounted child.
 
 **Outstanding is a query too, and settling is just a `payment`.**
 `GET /admin/outstanding` is computed from the ledger the same way participants
