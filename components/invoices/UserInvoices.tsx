@@ -10,6 +10,7 @@ import { formatDateTime, formatRelative } from "@/lib/format/datetime";
 import { outstandingOn } from "@/lib/format/invoices";
 import { formatMoney } from "@/lib/format/money";
 import { InvoicePdfButton } from "./InvoicePdfButton";
+import { MarkInvoicePaidButton } from "./MarkInvoicePaidButton";
 
 /**
  * What this person has been billed, and for what.
@@ -108,8 +109,11 @@ export function UserInvoices({ userId }: { userId: string }) {
                     >
                       {formatRelative(row.due_at)}
                     </td>
-                    <td className="px-2.5 py-1.5 text-right">
-                      <InvoicePdfButton invoiceId={row.id} number={row.number} />
+                    <td className="px-2.5 py-1.5">
+                      <div className="flex justify-end gap-1.5">
+                        <MarkInvoicePaidButton invoice={row} />
+                        <InvoicePdfButton invoiceId={row.id} number={row.number} />
+                      </div>
                     </td>
                   </tr>
                 );

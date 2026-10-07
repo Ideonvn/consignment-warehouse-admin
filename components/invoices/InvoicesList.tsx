@@ -17,6 +17,7 @@ import { formatDateTime, formatRelative } from "@/lib/format/datetime";
 import { outstandingOn } from "@/lib/format/invoices";
 import { formatMoney } from "@/lib/format/money";
 import { InvoicePdfButton } from "./InvoicePdfButton";
+import { MarkInvoicePaidButton } from "./MarkInvoicePaidButton";
 
 /**
  * Every issued invoice, newest first.
@@ -190,6 +191,8 @@ export function InvoicesList() {
                         </td>
                         <td className="px-2.5 py-1.5">
                           <div className="flex justify-end gap-1.5">
+                            {/* Renders nothing on a settled document. */}
+                            <MarkInvoicePaidButton invoice={row} />
                             <InvoicePdfButton
                               invoiceId={row.id}
                               number={row.number}

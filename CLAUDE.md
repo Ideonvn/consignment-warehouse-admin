@@ -342,6 +342,32 @@ explains. It disappears entirely for someone with no open invoices.
 worth, or more than the invoice still owes — and the refusal takes the payment down with it. Both
 forms check before submitting, so the operator fixes a number rather than losing the entry.
 
+**`MarkInvoicePaidButton` settles one invoice from the row it is on** (2026-10-07), on all three
+invoice lists: the console, the auction's Invoices tab, and the user's own Account tab. It is
+**not** a mark-as-paid route and there still is not one — it posts the same ordinary `payment`
+with the allocation riding along, reversible like any other entry. It exists because the
+navigation was the whole cost: most invoices are settled one bank line at a time, and opening a
+person's account for each is four clicks of travel around one click of work. It is on
+`UserInvoices` too, which looks redundant until you picture making an operator leave the row in
+front of them to settle it.
+
+Three rules it carries:
+
+- **The amount defaults to what is still outstanding**, floored at the document total. The floor
+  cannot bite — `paid_minor` is summed from allocations and the server refuses an over-allocation,
+  so outstanding is always within `[0, total]` — and it is written anyway, because the default
+  lands in a `MoneyInput` that posts real money.
+- **The allocation sent is `min(amount, outstanding)`, not the amount.** An operator who types more
+  than this document owes gets the excess as on-account credit, which is ordinary and which the
+  dialog says on screen. Sending the full amount would be an over-allocation, which is refused and
+  takes the payment with it.
+- **The reference defaults to the invoice NUMBER**, not the person's standing reference — the rule
+  above about which surface quotes which, applied where it bites.
+
+It renders nothing for a settled document, and that guard sits **after** every hook: an early
+return above `useMutation` changes hook order between a paid row and an unpaid one, which is a
+lint error and a real bug in a table whose rows change status under React.
+
 ⚠️ **There is no un-allocate and no allocation reversal, and none should be built.** An allocation
 is not money: the ledger entry it points at is untouched and immutable, so an allocation whose
 entry has been reversed simply stops counting. **Reversing the payment IS the correction**, which

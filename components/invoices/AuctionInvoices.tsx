@@ -15,6 +15,7 @@ import { outstandingOn } from "@/lib/format/invoices";
 import { formatMoney } from "@/lib/format/money";
 import type { AuctionAdmin } from "@/types/api";
 import { InvoicePdfButton } from "./InvoicePdfButton";
+import { MarkInvoicePaidButton } from "./MarkInvoicePaidButton";
 
 /**
  * What this sale has been billed, and the one manual way to bill the rest.
@@ -150,11 +151,14 @@ export function AuctionInvoices({ auction }: { auction: AuctionAdmin }) {
                     <td className="px-2.5 py-1.5">
                       <InvoiceStatusBadge status={row.status} />
                     </td>
-                    <td className="px-2.5 py-1.5 text-right">
-                      <InvoicePdfButton
-                        invoiceId={row.id}
-                        number={row.number}
-                      />
+                    <td className="px-2.5 py-1.5">
+                      <div className="flex justify-end gap-1.5">
+                        <MarkInvoicePaidButton invoice={row} />
+                        <InvoicePdfButton
+                          invoiceId={row.id}
+                          number={row.number}
+                        />
+                      </div>
                     </td>
                   </tr>
                 );
