@@ -28,7 +28,7 @@ never modifies the backend**; requests for it are collected in
   `make dev` brings it up with the rest of the stack.
 
 Seeded accounts (while the backend runs with `APP_ENV=local`, **the OTP code is
-always `0000`**):
+always `000000`**):
 
 | Number          | Role       |
 | --------------- | ---------- |

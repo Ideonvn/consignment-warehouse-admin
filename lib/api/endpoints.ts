@@ -11,6 +11,7 @@ import {
   bidSchema,
   confirmImageSchema,
   depositEntryAdminSchema,
+  demoLoginAdminSchema,
   depositStatementSchema,
   incrementRuleSchema,
   invoiceAdminDetailSchema,
@@ -28,6 +29,7 @@ import {
   type AdminUserDetail,
   type AuctionAdmin,
   type AuctionMutation,
+  type DemoLoginAdmin,
   type AuctionStatus,
   type Bid,
   type ChangeRoleInput,
@@ -35,6 +37,7 @@ import {
   type CreateAuctionInput,
   type CreateIncrementRuleInput,
   type CreateLotInput,
+  type CreateDemoLoginInput,
   type CreateDepositEntryInput,
   type CreateLedgerEntryInput,
   type CursorPage,
@@ -595,6 +598,51 @@ export function reverseDepositEntry(
     method: "POST",
     body: { reason },
     schema: depositEntryAdminSchema,
+  });
+}
+
+/* ---------------------------------------------------------- demo sign-ins */
+
+/**
+ * Superadmin only — minting one is a complete credential to whatever account
+ * that number owns, which puts it in the same class as a role change.
+ *
+ * No paging: there is one row per store review channel by construction.
+ */
+export async function listDemoLogins(
+  signal?: AbortSignal,
+): Promise<DemoLoginAdmin[]> {
+  return apiRequest("/admin/demo-logins", {
+    schema: z.array(demoLoginAdminSchema),
+    signal,
+  });
+}
+
+/**
+ * The number goes in the body, never the path. Refusals worth handling on the
+ * screen: 422 when the number has bidding or financial history (the
+ * never-retrofit guard) or the code is a pattern, 409 when the number already
+ * has a demo login.
+ */
+export function createDemoLogin(
+  body: CreateDemoLoginInput,
+): Promise<DemoLoginAdmin> {
+  return apiRequest("/admin/demo-logins", {
+    method: "POST",
+    body,
+    schema: demoLoginAdminSchema,
+  });
+}
+
+/**
+ * By row id rather than by number, for the same reason create uses a body.
+ *
+ * The account the demo sign-ins created stays — it is a real account that
+ * really signed in, and withdrawing a credential is not deleting someone.
+ */
+export function deleteDemoLogin(demoLoginId: string): Promise<void> {
+  return apiRequestVoid(`/admin/demo-logins/${demoLoginId}`, {
+    method: "DELETE",
   });
 }
 

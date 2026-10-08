@@ -138,3 +138,13 @@ export function InvoiceIcon(props: IconProps) {
     </Svg>
   );
 }
+
+/** A gear: settings, and deliberately the dullest glyph in the set. */
+export function SettingsIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="8" cy="8" r="2.2" />
+      <path d="M8 1.5v1.8M8 12.7v1.8M1.5 8h1.8M12.7 8h1.8M3.4 3.4l1.3 1.3M11.3 11.3l1.3 1.3M12.6 3.4l-1.3 1.3M4.7 11.3l-1.3 1.3" />
+    </Svg>
+  );
+}

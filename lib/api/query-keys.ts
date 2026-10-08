@@ -47,6 +47,12 @@ export const queryKeys = {
   outstanding: (page: number) => ["outstanding", "page", page] as const,
   outstandingCount: ["outstanding", "count"] as const,
 
+  /**
+   * Demo sign-ins. One flat key — there are a handful by construction, one per
+   * store review channel, so the endpoint takes no paging and neither does this.
+   */
+  demoLogins: ["demo-logins"] as const,
+
   /** Every reserve-not-met lot across every auction, one page at a time. */
   decisionsRoot: ["decisions"] as const,
   decisions: (page: number) => ["decisions", "page", page] as const,

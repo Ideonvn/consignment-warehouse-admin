@@ -185,7 +185,7 @@ this reason.
 
 The portal signs in with **phone OTP against the production API**. In production
 `APP_ENV` is not `local`, so `OTP_DEV_CODE` does not apply: a real SMS is sent to
-a real handset, and there is no `0000`.
+a real handset, and there is no fixed code.
 
 There is deliberately **no bootstrap endpoint** — nothing in this app or the API
 promotes the first operator. So a freshly deployed portal has no one who can

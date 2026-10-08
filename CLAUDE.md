@@ -539,6 +539,59 @@ after creation. Two rules follow, and they are the whole point:
   unmount. Twenty lots of held previews is a real leak, and photos surviving a
   reset would attach lot 7's pictures to lot 8.
 
+### Demo sign-ins — the one superadmin-only screen
+
+`/settings` → **Demo sign-ins** (`components/settings/DemoLogins.tsx`). Phone OTP is the only
+way into this product, so an app store reviewer cannot sign in at all; a demo sign-in gives
+one number a fixed code and no SMS. The backend is the authority — see its CLAUDE.md under
+*Demo sign-ins* for the model, the never-retrofit guard and the rate-limit note.
+
+**The portal generates the code, and that is a decision rather than convenience.**
+`components/settings/demo-code.ts` draws six digits from `crypto.getRandomValues` and refuses
+the same shapes the backend refuses — a single repeated digit, a consecutive run — because the
+portal picks the code, so a generator that can produce something the API rejects turns a
+one-click action into a confusing 422. **Those rules are duplicated on purpose and must stay in
+step**; the backend remains the authority and this only keeps us from asking for a no. Bytes
+above 249 are discarded rather than taken `% 10`, which would make 0–5 likelier than 6–9: a
+measurable bias is not theoretical in a code that never expires.
+
+⚠️ **Six digits is a constant at every end, not a setting.** `LENGTH` here, `OTP_CODE_LENGTH` in
+the backend's `app/core/config.py`, and literals in both bidder clients. It was briefly a
+per-client env var set to `4` locally, which is exactly how this generator came to produce codes a
+local bidder build could not accept — the backend now owns the number and refuses a dev code of
+any other length. Changing it means changing every end in one release.
+
+⚠️ **The code is shown twice and then never again.** The backend stores a one-way HMAC, so
+nothing can read it back — not the screen, not the API, not the database. It is on the create
+form (the operator wants it in App Store Connect before pressing anything) and again on the
+confirmation step, whose only job is to say that this is the last time. A lost code is replaced
+by removing the row and creating another; there is no recovery and the dialog says so rather
+than implying one.
+
+A new code is drawn on every opening of the dialog, including after a cancel. Reusing one
+across two numbers would make a single leak open two accounts.
+
+**`last_used_at` is rendered as "never" rather than left blank.** It is the only thing that
+distinguishes a row that can be removed with confidence from one a review may be depending on,
+and blank reads as missing data. It is **not** a usage cap.
+
+**Settings is hidden from an ordinary admin, not shown disabled.** The sidebar's
+`disabledReason` is for state the operator can change ("open an auction to see its lots"), and
+a role is not that — a greyed-out item they can never use is a standing question with no
+answer. The page itself still renders a refusal rather than redirecting, because an admin who
+followed a link from a superadmin deserves an answer, and `useDemoLogins` is gated in `enabled`
+so they never fire a request that returns 403 and surfaces as an error state.
+
+**That gating lives in two places today and should collapse to one.** Everything on `/settings`
+is superadmin-only, so the nav item, the page and the query are all conditional. The moment a
+section an ordinary admin should see is added, the gate moves down to the demo sign-ins section
+and the nav item stops being conditional. The current arrangement is the smaller of the two, not
+a claim that settings are inherently privileged.
+
+**It is deliberately not in the command palette.** The palette's static list is a curated
+subset — Outstanding and Invoices are not in it either — and a destination most operators
+cannot reach does not belong in a search everyone uses.
+
 ## Theming
 
 Three settings — Light / Dark / System — with **Light as the default**, so the
@@ -638,7 +691,7 @@ recorded known gap) and one should not be created for this.
 ```
 app/            routes: thin server shells and the (console) route group
 components/ui/  primitives — Button, MoneyInput, DateTimeInput, Dialog, DataTable…
-components/     feature components by area: auctions, lots, users, monitor, app-shell
+components/     feature components by area: auctions, lots, users, monitor, settings, app-shell
 lib/api/        transport, authenticated client, one function per endpoint, query hooks
 lib/auth/       session, refresh, device id — isolated and swappable
 lib/realtime/   WebSocket client and the monitor's event folding
@@ -686,7 +739,7 @@ The backend must be running: `make dev-all` (API plus the lifecycle worker that
 opens and closes lots — without it nothing ever closes, so the monitor and the
 decisions queue have nothing to show), `make seed`, and object storage up for images.
 
-While the backend runs with `APP_ENV=local` the **OTP code is always `0000`**.
+While the backend runs with `APP_ENV=local` the **OTP code is always `000000`**.
 Seeded: superadmin `+27820000000`, admin `+27820000001`, bidders
 `+27820000002`–`4`. The OTP endpoint is rate-limited per phone *and* per source
 address, so scripted logins run out quickly — reuse a session rather than

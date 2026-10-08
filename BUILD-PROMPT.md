@@ -111,7 +111,7 @@ Create `.env.local` and a documented `.env.example`.
 
 ### Authentication — identical to the consumer app
 
-While the backend runs with `APP_ENV=local`, **the OTP code is always `0000`**.
+While the backend runs with `APP_ENV=local`, **the OTP code is always `000000`**.
 Seeded admin: **`+27820000001`**. Seeded bidders: `+27820000002`, `+27820000003`, `+27820000004`.
 
 - `POST /auth/otp/request` — `{ "phone": "+27820000001" }` → `200 {detail}`. Phone must be E.164;
@@ -500,7 +500,7 @@ App shell: sidebar, top bar, toasts, error boundary, and primitives — `Button`
 `ConfirmDialog` (with type-to-confirm), `Table`, `StatusBadge`, `Skeleton`, `EmptyState`,
 `Countdown`.
 
-**Gate**, plus a real login against the running backend with `+27820000001` / `0000`.
+**Gate**, plus a real login against the running backend with `+27820000001` / `000000`.
 
 ### M2 — Auctions list and creation
 
@@ -619,7 +619,7 @@ verify, do not assume.
 Run the gate, then walk the whole operator journey against the running backend and record it in
 `NOTES.md`:
 
-log in as `+27820000001` with `0000` → create an auction → add three lots, one with a reserve →
+log in as `+27820000001` with `000000` → create an auction → add three lots, one with a reserve →
 upload images to a lot → publish → bid from the bidder app or a second account → watch the monitor
 update live → void a bid and confirm the leader recalculates → edit `ends_at` and confirm lots
 cascade → withdraw a lot → let a lot close below reserve → accept the reserve from the decisions

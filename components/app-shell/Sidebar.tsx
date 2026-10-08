@@ -2,7 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useDecisionCount, useOutstandingCount } from "@/lib/api/queries";
+import {
+  useCurrentRole,
+  useDecisionCount,
+  useOutstandingCount,
+} from "@/lib/api/queries";
+import { isSuperadmin } from "@/lib/auth";
 import { useAuctionContextStore } from "@/lib/ui/auction-context";
 import { cn } from "@/lib/utils";
 import {
@@ -12,6 +17,7 @@ import {
   LotIcon,
   MoneyIcon,
   MonitorIcon,
+  SettingsIcon,
   UsersIcon,
 } from "./icons";
 
@@ -38,6 +44,7 @@ export function Sidebar({
   const decisions = useDecisionCount();
   const outstanding = useOutstandingCount();
   const auction = useAuctionContextStore((s) => s.auction);
+  const role = useCurrentRole();
 
   const items: NavItem[] = [
     {
@@ -97,6 +104,21 @@ export function Sidebar({
       match: (p) => p.startsWith("/users"),
     },
   ];
+
+  // Hidden rather than shown disabled, because `disabledReason` is for state an
+  // operator can change — "open an auction first" — and a role is not that. A
+  // greyed-out item they can never use is a standing question with no answer.
+  //
+  // Everything on that screen is superadmin-only today; the item stops being
+  // conditional the moment a section an ordinary admin should see is added.
+  if (isSuperadmin(role)) {
+    items.push({
+      href: "/settings",
+      label: "Settings",
+      icon: SettingsIcon,
+      match: (p) => p.startsWith("/settings"),
+    });
+  }
 
   const expanded = variant === "drawer";
 

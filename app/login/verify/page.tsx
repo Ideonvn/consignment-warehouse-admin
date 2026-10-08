@@ -105,10 +105,14 @@ function VerifyForm() {
             inputMode="numeric"
             autoComplete="one-time-code"
             autoFocus
-            // Deliberately no placeholder: "0000" was the local dev code, so it
-            // showed every production operator a four-character example of a
-            // six-digit code. The hint below says where the code comes from.
-            // The cap is a ceiling, not a length — it accommodates both.
+            // Deliberately no placeholder. It used to be "0000" — the local dev
+            // code at the time — which showed every production operator a
+            // four-character example of a six-digit code. The dev code is now
+            // six digits like every other, so that specific mismatch is gone,
+            // but a placeholder shaped like a real code is still noise: the
+            // hint below says where the code comes from.
+            // The cap is a ceiling, not a length. The API accepts 4–10 and
+            // decides; this input does not restate the length.
             maxLength={8}
             className="tnum tracking-[0.4em]"
             value={code}

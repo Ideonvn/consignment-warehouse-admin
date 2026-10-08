@@ -877,6 +877,49 @@ export type WsClientMessage =
   | { action: "ping" }
   | { action: "pong" };
 
+/* ------------------------------------------------------------ demo logins */
+
+/**
+ * A demo sign-in: a fixed login code for a phone number nobody can receive SMS
+ * on, so an app store reviewer can get into a phone-OTP-only app.
+ *
+ * **There is no `code` field and there cannot be.** The backend stores it as a
+ * one-way HMAC, so nothing can read it back — which is deliberate, because the
+ * credential belongs in App Store Connect rather than on an admin screen. A
+ * forgotten code is replaced, not recovered.
+ */
+export const demoLoginAdminSchema = z.object({
+  id: z.string(),
+  phone_e164: z.string(),
+  note: z.string().nullable(),
+  created_by_user_id: z.string(),
+  created_at: z.string(),
+  /**
+   * Null means no code has ever been minted from this row, so it is safe to
+   * remove. It is NOT a usage cap — a demo account has to keep working for
+   * every review for the life of the app.
+   */
+  last_used_at: z.string().nullable(),
+});
+export type DemoLoginAdmin = z.infer<typeof demoLoginAdminSchema>;
+
+/**
+ * `phone` is sent in the BODY, never a path segment: the backend holds
+ * `phone_e164` to the same rule as a reserve price, and a URL ends up in access
+ * logs, proxies and browser history.
+ *
+ * `code` is six digits and is refused if it is a single repeated digit or a
+ * consecutive run — a demo code is standing rather than one-time, so
+ * guessability is a different risk. The portal generates it; see
+ * `components/settings/demo-code.ts`.
+ */
+export const createDemoLoginSchema = z.object({
+  phone: z.string().min(6).max(25),
+  code: z.string().length(6),
+  note: z.string().max(500).nullable().optional(),
+});
+export type CreateDemoLoginInput = z.infer<typeof createDemoLoginSchema>;
+
 /* ------------------------------------------------------------ list params */
 
 export interface OffsetPage {

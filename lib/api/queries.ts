@@ -6,7 +6,7 @@ import {
   useQueryClient,
   type UseQueryOptions,
 } from "@tanstack/react-query";
-import { useSessionStore } from "@/lib/auth";
+import { isSuperadmin, useSessionStore } from "@/lib/auth";
 import type { AuctionAdmin, LotAdminSummary, UserRole } from "@/types/api";
 import * as api from "./endpoints";
 import { queryKeys } from "./query-keys";
@@ -354,6 +354,26 @@ export function useAuctionInvalidation() {
     void client.invalidateQueries({ queryKey: ["auctions"] });
     void client.invalidateQueries({ queryKey: queryKeys.lots(auctionId) });
   };
+}
+
+/* ---------------------------------------------------------- demo sign-ins */
+
+/**
+ * Demo sign-ins, superadmin only.
+ *
+ * Gated in `enabled` as well as on the screen, deliberately: an ordinary admin
+ * landing on /settings would otherwise fire a request that comes back 403 and
+ * shows up as an error state rather than as a page that is not for them. The
+ * backend is still the authority — this only keeps the portal from asking.
+ */
+export function useDemoLogins() {
+  const role = useCurrentRole();
+  const enabled = useAuthed() && isSuperadmin(role);
+  return useQuery({
+    queryKey: queryKeys.demoLogins,
+    enabled,
+    queryFn: ({ signal }) => api.listDemoLogins(signal),
+  });
 }
 
 export function useCurrentRole(): UserRole | null {

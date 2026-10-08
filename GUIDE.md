@@ -43,7 +43,7 @@ OTP, WebSocket-ticket and bid counters instantly. You never need to wait an hour
 a "start here" table pointing at the interesting lots. **Keep it open while you test.** The numbers
 below are stable across seeds, but the exact lot ids are not.
 
-The OTP is **`0000`** for every account.
+The OTP is **`000000`** for every account.
 
 | Phone | Role |
 |---|---|
@@ -398,7 +398,7 @@ Re-seed first (`make seed-fresh`) so the time-sensitive auctions are fresh.
 
 ## A. Orientation
 
-**A1 — Sign in** as `+27820000001`, code `0000`.
+**A1 — Sign in** as `+27820000001`, code `000000`.
 *Expect:* the auctions list showing all five seeded auctions, including the draft.
 
 **A2 — Sign in as a bidder here** (`+27820000002`).
