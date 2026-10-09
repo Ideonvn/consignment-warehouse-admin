@@ -117,6 +117,33 @@ operator is never guessing, **and** handle the structured `409`
 (`{detail: {message, field}}`) as a backstop by highlighting that field. The
 backend is the authority; the client-side rules are a mirror that can drift.
 
+**The create form's defaults are a product decision, not placeholders**, and two of them
+changed on 2026-10-09 on stakeholder feedback:
+
+- **`max_extensions: 1000`** — the API's own ceiling (`le=1000`), not a tuned figure. They want
+  anti-snipe to keep firing for as long as people keep bidding, which is what "going, going,
+  gone" means at a live sale. At the 300s/300s anti-snipe defaults beside it, 1000 extensions is
+  days of possible extension, so read it as "until the bidding stops" rather than as a count
+  anyone reaches. **Four nines was asked for and is not possible**: the backend refuses anything
+  above 1000 with a 422, and raising that is a backend change nobody has asked for.
+
+  ⚠️ **The cost, which is real and belongs with the decision.** Only each LOT's clock extends —
+  the auction's own `ends_at` never moves — and an auction goes `ended` only once its last lot
+  has finished. So invoicing for a whole sale now waits on its single most contested lot, which
+  can be hours or days past the advertised close. It also means deferred counter-bids keep
+  deferring for as long as extensions last, where before they stopped once the cap was spent.
+  If that becomes a problem the answer is a shorter extension window, not a lower cap: the cap
+  is what the stakeholders asked for and the window is what makes it expensive.
+
+- **`commission_bps: 1500`** — 15%, the rate the approved invoice design prints and the one every
+  sale has used. It was `0`, which meant an operator had to remember to set it on every auction
+  and a forgotten one billed no commission at all. It stays editable until the first bid.
+
+Neither changes the BACKEND's defaults (`AuctionCreateIn` still has `max_extensions=20`,
+`commission_bps=0`). That divergence is deliberate for now — the portal is the only thing that
+creates auctions, so the form default is the effective one, and changing the API default would
+silently re-price any other caller. Worth revisiting if a second client ever creates auctions.
+
 **The `ends_at` cascade.** Changing an auction's `ends_at` moves every
 not-yet-ended lot with it and preserves each lot's earned anti-snipe extensions
 as a delta. Show what will move before submitting, and surface

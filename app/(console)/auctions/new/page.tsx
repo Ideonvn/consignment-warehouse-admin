@@ -108,13 +108,24 @@ export default function NewAuctionPage() {
       currency_code: "ZAR",
       anti_snipe_window_seconds: 300,
       anti_snipe_extension_seconds: 300,
-      max_extensions: 20,
+      // The API's own ceiling (`le=1000`), not a tuned figure: the stakeholders
+      // want anti-snipe to keep firing for as long as people keep bidding, which
+      // is what "going, going, gone" means at a live sale. At the 300s/300s
+      // defaults beside it this is days of possible extension, so treat it as
+      // "until the bidding stops" rather than as a count anyone will reach.
+      //
+      // The cost, which is real: the AUCTION's ends_at never moves, only each
+      // lot's, and an auction goes `ended` only once its last lot has finished —
+      // so invoicing for a whole sale waits on its single most contested lot.
+      max_extensions: 1000,
       // Public by default, matching the backend's `AuctionCreateIn.visibility`
       // default. Publishing is still a second gate — a public DRAFT is not on
       // the public site — so this preselection exposes nothing on its own.
       visibility: "public",
       deposit_amount_minor: 0,
-      commission_bps: 0,
+      // 15%, the rate the approved invoice design prints and the one every sale
+      // has used. It stays editable until the first bid freezes it.
+      commission_bps: 1500,
     },
   });
 
@@ -455,7 +466,7 @@ export default function NewAuctionPage() {
               label="Max extensions"
               htmlFor="max_extensions"
               error={errors.max_extensions?.message}
-              hint="Per lot."
+              hint="Per lot. 1000 is the API's ceiling — effectively until the bidding stops."
             >
               <Input
                 id="max_extensions"
